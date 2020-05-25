@@ -1,19 +1,19 @@
 ﻿
 using DataAccess.Data;
 using DataAccess.Models;
-using DataAccess.Utils;
 using HtmlAgilityPack;
+using log4net.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Reflection;
 
 namespace CollectData
 {
     class TratuParser
     {
+        private static ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
+
         private DictionaryContext context;
 
         public TratuParser(DictionaryContext context)
@@ -23,9 +23,6 @@ namespace CollectData
 
         public void Parse()
         {
-            //ReadWord("http://tratu.soha.vn/dict/en_vn/Acclimate");
-            //return;
-
             HtmlWeb htmlWeb = new HtmlWeb();
             var htmlDoc = htmlWeb.Load("http://tratu.soha.vn/dict/en_vn/special:allpages");
 
@@ -33,6 +30,7 @@ namespace CollectData
 
             foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
             {
+                // TODO
                 if (count >= 15)
                     ReadPage(link.Attributes["href"].Value);
 
@@ -50,7 +48,6 @@ namespace CollectData
             var wordNodes = htmlDoc.DocumentNode.SelectNodes("//div[@id='bodyContent']/table[2]//td/a");
             foreach (var node in wordNodes)
             {
-                Console.WriteLine($"Getting a new word at {node.Attributes["href"].Value}");
                 var word = ReadWord(node.Attributes["href"].Value);
                 if (word != null)
                 {
@@ -62,11 +59,13 @@ namespace CollectData
 
         private Word ReadWord(string href)
         {
+            var url = CreateFullUrl(href);
+            logger.Log(GetType(), Level.Debug, $"Geting a new word at {url}", null);
+
             try
             {
                 var word = new Word();
 
-                var url = CreateFullUrl(href);
                 HtmlWeb htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
 
@@ -109,7 +108,7 @@ namespace CollectData
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                logger.Log(GetType(), Level.Error, $"An error occured while processing {url}", ex);
                 return null;
             }
         }

@@ -1,4 +1,4 @@
-﻿namespace DataAccess.Utils
+﻿namespace CollectData
 {
     static class StringExtension
     {
