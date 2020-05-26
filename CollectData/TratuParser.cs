@@ -3,10 +3,13 @@ using DataAccess.Data;
 using DataAccess.Models;
 using HtmlAgilityPack;
 using log4net.Core;
+using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace CollectData
 {
@@ -14,7 +17,11 @@ namespace CollectData
     {
         private static ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
 
+        private const int NUMBER_OF_CONCURRENT_PROCESSING_WORDS = 10;
+
         private DictionaryContext context;
+
+        private ConcurrentBag<Word> parsedWords = new ConcurrentBag<Word>();
 
         public TratuParser(DictionaryContext context)
         {
@@ -23,37 +30,62 @@ namespace CollectData
 
         public void Parse()
         {
-            HtmlWeb htmlWeb = new HtmlWeb();
-            var htmlDoc = htmlWeb.Load("http://tratu.soha.vn/dict/en_vn/special:allpages");
+            var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
+            logger.Log(GetType(), Level.Debug, $"Processing all pages at {url}", null);
 
-            int count = 0;
+            HtmlWeb htmlWeb = new HtmlWeb();
+            var htmlDoc = htmlWeb.Load(url);
 
             foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
             {
-                // TODO
-                if (count >= 15)
-                    ReadPage(link.Attributes["href"].Value);
-
-                count++;
+                ReadPage(link.Attributes["href"].Value);
             }
-            Console.ReadLine();
         }
 
         private void ReadPage(string href)
         {
             var url = CreateFullUrl(href);
+            logger.Log(GetType(), Level.Debug, $"Processing a page at {url}", null);
+
             HtmlWeb htmlWeb = new HtmlWeb();
             var htmlDoc = htmlWeb.Load(url);
 
             var wordNodes = htmlDoc.DocumentNode.SelectNodes("//div[@id='bodyContent']/table[2]//td/a");
-            foreach (var node in wordNodes)
+
+            List<Task> parserTasks = new List<Task>();
+
+            int currentIndex = 0;
+
+            while (currentIndex < wordNodes.Count)
             {
-                var word = ReadWord(node.Attributes["href"].Value);
-                if (word != null)
+                int x = Math.Min(NUMBER_OF_CONCURRENT_PROCESSING_WORDS, wordNodes.Count - currentIndex);
+                for (int i = 0; i < x; i++)
                 {
-                    context.Words.Add(word);
+                    parserTasks.Add(Task.Run(() =>
+                    {
+                        var word = ReadWord(wordNodes[currentIndex].Attributes["href"].Value);
+                        if (word != null)
+                        {
+                            parsedWords.Add(word);
+                        }
+                    }));
+                    currentIndex++;
+                }
+
+                Task.WaitAll(parserTasks.ToArray());
+                parserTasks.Clear();
+
+                try
+                {
+                    context.Words.AddRange(parsedWords);
                     context.SaveChanges();
                 }
+                catch (DbUpdateException ex)
+                {
+                    logger.Log(GetType(), Level.Error, $"Could not save {parsedWords.Count} words to database", ex);
+                }
+
+                parsedWords.Clear();
             }
         }
 
@@ -82,11 +114,10 @@ namespace CollectData
                 word.Spelling = spellingNode?.InnerText;
                 word.SpellingAudioUrl = null; // The audio link does not work anymore!
 
-                var dictionaryNodes = contentNode.SelectNodes("./div[position() > 2]");
-                //var dictionaryNodes = contentNode.SelectNodes("./div[position() > 2][img]");
-                // TODO
+                var dictionaryNodes = contentNode.SelectNodes("./div[@class='section-h2']");
                 if (dictionaryNodes == null)
                 {
+                    logger.Log(GetType(), Level.Error, $"Could not find any dictionary node at {url}", null);
                     return null;
                 }
 
@@ -108,7 +139,7 @@ namespace CollectData
             }
             catch (Exception ex)
             {
-                logger.Log(GetType(), Level.Error, $"An error occured while processing {url}", ex);
+                logger.Log(GetType(), Level.Error, $"An error occured while getting a word at {url}", ex);
                 return null;
             }
         }
@@ -126,11 +157,7 @@ namespace CollectData
                 };
             }
 
-            //var wordClassNodes = dictionaryNode.SelectNodes("./div");
-            //TODO
-            var wordClassNodes = dictionaryNode.SelectNodes("./div[img]");
-
-
+            var wordClassNodes = dictionaryNode.SelectNodes("./div[@class='section-h3']");
             if (wordClassNodes != null)
             {
                 var wordFormsNode = wordClassNodes.SingleOrDefault(c => c.SelectSingleNode("./h3[1]/span")?.InnerHtml.IndexOf("Hình thái từ", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -152,12 +179,13 @@ namespace CollectData
             else
             {
                 // TODO need to process here
+                logger.Log(GetType(), Level.Warn, "Could not get any word class node", null);
             }
         }
 
         private IEnumerable<Definition> ReadWordClass(HtmlNode wordClassNode, Word word, Dictionary dictionary)
         {
-            string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText.TrimNewLine(); // TODO really need this
+            string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText.TrimAllSpecialCharacters(); // TODO really need this
             WordClass wordClass = context.WordClasses.SingleOrDefault(wc => wc.Name == wordClassText);
             if (wordClass == null)
             {
@@ -168,17 +196,29 @@ namespace CollectData
             }
 
             var definitionNodes = wordClassNode.SelectNodes("./div");
+            if (definitionNodes == null)
+            {
+                // Treat wordClassNode as a definiton node (http://tratu.soha.vn/dict/en_vn/Allegedly)
+                return new List<Definition>() { ReadDefinition(wordClassNode, word, dictionary, wordClass) };
+            }
+
             return definitionNodes.Select(n => ReadDefinition(n, word, dictionary, wordClass));
         }
 
         private Definition ReadDefinition(HtmlNode definitionNode, Word word, Dictionary dictionary, WordClass wordClass)
         {
-            var definitionText = definitionNode.SelectSingleNode("./h5[1]/span").InnerText;
+            var definitionTextNode = definitionNode.SelectSingleNode("./h5[1]/span");
+
+            // This is in case wordClassNode treated as a definition node (http://tratu.soha.vn/dict/en_vn/Allegedly)
+            if (definitionTextNode == null)
+            {
+                definitionTextNode = definitionNode.SelectSingleNode("./h3[1]/span");
+            }
             var usageNodes = definitionNode.SelectNodes("./dl/dd/dl/dd")?.Select(u => u.InnerText).ToList();
 
             Definition definition = new Definition()
             {
-                Content = definitionText,
+                Content = definitionTextNode?.InnerText,
                 Word = word,
                 Dictionary = dictionary,
                 WordClass = wordClass,
@@ -189,7 +229,7 @@ namespace CollectData
             {
                 if (usageNodes.Count % 2 != 0)
                 {
-                    Console.WriteLine("Problems with reading usages"); // TODO
+                    logger.Log(GetType(), Level.Error, "Number of usages is an old number", null);
                 }
                 else
                 {
@@ -229,7 +269,7 @@ namespace CollectData
                     defNodes.Append(HtmlNode.CreateNode("dummy"));
                     foreach (HtmlNode d in defNodes)
                     {
-                        string defContent = d.SelectSingleNode("./text()")?.InnerText.TrimNewLine();
+                        string defContent = d.SelectSingleNode("./text()")?.InnerText.TrimAllSpecialCharacters();
                         var usageNodes = d.SelectNodes("./dl/dd");
 
                         if (!string.IsNullOrEmpty(defContent) || d.InnerHtml == "dummy")
@@ -271,7 +311,7 @@ namespace CollectData
                 else
                 {
                     var defContentNode = phaseContentNode.NextSibling.NextSibling;
-                    var defContent = defContentNode.InnerText?.TrimNewLine();
+                    var defContent = defContentNode.InnerText?.TrimAllSpecialCharacters();
                     phase.Definitions = new List<PhaseDefinition>() {
                         new PhaseDefinition() { Content = defContent }
                     };
@@ -287,7 +327,7 @@ namespace CollectData
             {
                 return new WordForm()
                 {
-                    FormType = wf.SelectSingleNode("./text()").InnerHtml.Trim(' ', '\t', ':'),
+                    FormType = wf.SelectSingleNode("./text()").InnerHtml.TrimAllSpecialCharacters(),
                     Content = wf.SelectSingleNode("./a").InnerHtml
                 };
             }).ToList();
