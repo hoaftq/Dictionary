@@ -15,77 +15,141 @@ namespace CollectData
 {
     class TratuParser
     {
-        private static ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
+        private const int NUMBER_OF_CONCURRENT_PROCESSING_WORDS = 20;
 
-        private const int NUMBER_OF_CONCURRENT_PROCESSING_WORDS = 10;
+        private static readonly ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
 
-        private DictionaryContext context;
-
-        private ConcurrentBag<Word> parsedWords = new ConcurrentBag<Word>();
+        private readonly DictionaryContext context;
 
         public TratuParser(DictionaryContext context)
         {
             this.context = context;
         }
 
-        public void Parse()
+        public void Parse(string href = null)
         {
-            var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
-            logger.Log(GetType(), Level.Debug, $"Processing all pages at {url}", null);
-
-            HtmlWeb htmlWeb = new HtmlWeb();
-            var htmlDoc = htmlWeb.Load(url);
-
-            foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
+            if (href == null || href.EndsWith("/special:allpages", StringComparison.OrdinalIgnoreCase))
             {
-                ReadPage(link.Attributes["href"].Value);
+                var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
+                logger.Log(GetType(), Level.Debug, $"Processing all pages at {url}", null);
+
+                HtmlWeb htmlWeb = new HtmlWeb();
+                var htmlDoc = htmlWeb.Load(url);
+
+                foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
+                {
+                    ParsePage(link.Attributes["href"].Value);
+                }
+            }
+            else if (href.Contains("%C4%90%E1%BA%B7c_bi%E1%BB%87t:Allpages/", StringComparison.OrdinalIgnoreCase))
+            {
+                ParsePage(href);
+            }
+            else
+            {
+                ParseWord(href);
             }
         }
 
-        private void ReadPage(string href)
+        public void ParsePage(string href)
         {
             var url = CreateFullUrl(href);
             logger.Log(GetType(), Level.Debug, $"Processing a page at {url}", null);
 
-            HtmlWeb htmlWeb = new HtmlWeb();
-            var htmlDoc = htmlWeb.Load(url);
-
-            var wordNodes = htmlDoc.DocumentNode.SelectNodes("//div[@id='bodyContent']/table[2]//td/a");
-
-            List<Task> parserTasks = new List<Task>();
-
-            int currentIndex = 0;
-
-            while (currentIndex < wordNodes.Count)
+            var htmlDoc = LoadPageWithTimeout(url, 1);
+            if (htmlDoc == null)
             {
-                int x = Math.Min(NUMBER_OF_CONCURRENT_PROCESSING_WORDS, wordNodes.Count - currentIndex);
-                for (int i = 0; i < x; i++)
+                logger.Log(GetType(), Level.Error, $"Loading page {url} timed out", null);
+            }
+
+            IEnumerable<HtmlNode> wordNodes = htmlDoc.DocumentNode.SelectNodes("//div[@id='bodyContent']/table[2]//td/a");
+
+            do
+            {
+                var consecutiveNodes = wordNodes.Take(NUMBER_OF_CONCURRENT_PROCESSING_WORDS);
+                GetAndSaveWords(consecutiveNodes);
+
+                wordNodes = wordNodes.Skip(NUMBER_OF_CONCURRENT_PROCESSING_WORDS);
+            } while (wordNodes.Count() > 0);
+        }
+
+        public void ParseWord(string href)
+        {
+            var word = ReadWord(href);
+            if (word != null)
+            {
+                SaveWord(word);
+            }
+        }
+
+        private void GetAndSaveWords(IEnumerable<HtmlNode> wordNodes)
+        {
+            var parsedWords = new ConcurrentBag<Word>();
+            List<Task> parserTasks = new List<Task>();
+            foreach (var w in wordNodes)
+            {
+                parserTasks.Add(Task.Run(() =>
                 {
-                    parserTasks.Add(Task.Run(() =>
+                    var word = ReadWord(w.Attributes["href"].Value);
+                    if (word != null)
                     {
-                        var word = ReadWord(wordNodes[currentIndex].Attributes["href"].Value);
-                        if (word != null)
-                        {
-                            parsedWords.Add(word);
-                        }
-                    }));
-                    currentIndex++;
-                }
+                        parsedWords.Add(word);
+                    }
+                }));
+            }
 
-                Task.WaitAll(parserTasks.ToArray());
-                parserTasks.Clear();
+            Task.WaitAll(parserTasks.ToArray());
 
-                try
+            // Save each word separately
+            foreach (var word in parsedWords)
+            {
+                SaveWord(word);
+            }
+        }
+
+        private void SaveWord(Word word)
+        {
+            // If a dictionary or a word class already exists then use it, do not create a new one
+            if (word.Definitions != null)
+            {
+                foreach (var def in word.Definitions)
                 {
-                    context.Words.AddRange(parsedWords);
-                    context.SaveChanges();
-                }
-                catch (DbUpdateException ex)
-                {
-                    logger.Log(GetType(), Level.Error, $"Could not save {parsedWords.Count} words to database", ex);
-                }
+                    var dic = context.Dictionaries.SingleOrDefault(d => d.Name == def.Dictionary.Name);
+                    if (dic != null)
+                    {
+                        def.Dictionary = dic;
+                    }
 
-                parsedWords.Clear();
+                    var wc = context.WordClasses.SingleOrDefault(w => w.Name == def.WordClass.Name);
+                    if (wc != null)
+                    {
+                        def.WordClass = wc;
+                    }
+                }
+            }
+
+            if (word.Phases != null)
+            {
+                foreach (var p in word.Phases)
+                {
+                    var dic = context.Dictionaries.SingleOrDefault(d => d.Name == p.Dictionary.Name);
+                    if (dic != null)
+                    {
+                        p.Dictionary = dic;
+                    }
+                }
+            }
+
+            try
+            {
+                context.Words.AddRange(word);
+                context.SaveChanges();
+            }
+            catch (DbUpdateException ex)
+            {
+                // The word could not be saved, remove it from the context
+                context.Words.Remove(word);
+                logger.Log(GetType(), Level.Error, $"Could not save word {word.Content} to database", ex);
             }
         }
 
@@ -98,8 +162,12 @@ namespace CollectData
             {
                 var word = new Word();
 
-                HtmlWeb htmlWeb = new HtmlWeb();
-                var htmlDoc = htmlWeb.Load(url);
+                var htmlDoc = LoadPageWithTimeout(url, 1);
+                if (htmlDoc == null)
+                {
+                    logger.Log(GetType(), Level.Error, $"Loading page {url} timed out", null);
+                    return null;
+                }
 
                 var keywords = htmlDoc.DocumentNode.SelectNodes("//head/meta")
                     .FirstOrDefault(n => n.GetAttributeValue("name", null) == "keywords")
@@ -148,7 +216,7 @@ namespace CollectData
         {
             var dictionaryName = dictionaryNode.SelectSingleNode("./h2/span|./h3/span").InnerText;
 
-            Dictionary dictionary = context.Dictionaries.Where(d => d.Name == dictionaryName).SingleOrDefault();
+            Dictionary dictionary = null; // context.Dictionaries.Where(d => d.Name == dictionaryName).SingleOrDefault();
             if (dictionary == null)
             {
                 dictionary = new Dictionary()
@@ -185,8 +253,8 @@ namespace CollectData
 
         private IEnumerable<Definition> ReadWordClass(HtmlNode wordClassNode, Word word, Dictionary dictionary)
         {
-            string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText.TrimAllSpecialCharacters(); // TODO really need this
-            WordClass wordClass = context.WordClasses.SingleOrDefault(wc => wc.Name == wordClassText);
+            string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText.TrimAllSpecialCharacters();
+            WordClass wordClass = null; // context.WordClasses.SingleOrDefault(wc => wc.Name == wordClassText);
             if (wordClass == null)
             {
                 wordClass = new WordClass()
@@ -354,11 +422,34 @@ namespace CollectData
 
         private string CreateFullUrl(string url)
         {
+            if (url == null)
+            {
+                return null;
+            }
+
             if (url.StartsWith("http://") || url.StartsWith("https://"))
             {
                 return url;
             }
             return "http://tratu.soha.vn" + url;
+        }
+
+        private HtmlDocument LoadPageWithTimeout(string url, int timeoutInMinute)
+        {
+            var task = Task.Run(() =>
+            {
+                var htmlWeb = new HtmlWeb();
+                return htmlWeb.Load(url);
+            });
+
+            if (task.Wait(TimeSpan.FromMinutes(timeoutInMinute)))
+            {
+                return task.Result;
+            }
+            else
+            {
+                return null;
+            }
         }
     }
 }
