@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CollectData
@@ -20,6 +21,8 @@ namespace CollectData
         private static readonly ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
 
         private readonly DictionaryContext context;
+
+        private readonly ConcurrentQueue<Word> wordQueue = new ConcurrentQueue<Word>();
 
         public TratuParser(DictionaryContext context)
         {
@@ -36,10 +39,30 @@ namespace CollectData
                 HtmlWeb htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
 
+                CancellationTokenSource tokenSource = new CancellationTokenSource();
+                var registerTask = Task.Run(() =>
+                {
+                    while (!tokenSource.Token.IsCancellationRequested)
+                    {
+                        if (wordQueue.TryDequeue(out Word word))
+                        {
+                            SaveWord(word);
+                        }
+                    }
+                }, tokenSource.Token);
+
                 foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
                 {
                     ParsePage(link.Attributes["href"].Value);
                 }
+
+                // All words has been processed
+                while (wordQueue.Count > 0)
+                {
+                }
+
+                // End the register task
+                tokenSource.Cancel();
             }
             else if (href.Contains("%C4%90%E1%BA%B7c_bi%E1%BB%87t:Allpages/", StringComparison.OrdinalIgnoreCase))
             {
@@ -59,6 +82,10 @@ namespace CollectData
             var htmlDoc = LoadPageWithTimeout(url, 1);
             if (htmlDoc == null)
             {
+                htmlDoc = LoadPageWithTimeout(url, 1);
+            }
+            if (htmlDoc == null)
+            {
                 logger.Log(GetType(), Level.Error, $"Loading page {url} timed out", null);
             }
 
@@ -67,7 +94,21 @@ namespace CollectData
             do
             {
                 var consecutiveNodes = wordNodes.Take(NUMBER_OF_CONCURRENT_PROCESSING_WORDS);
-                GetAndSaveWords(consecutiveNodes);
+
+                // Load a block of words at a time and wait for that to complete before moving to another block
+                List<Task> parserTasks = new List<Task>();
+                foreach (var w in consecutiveNodes)
+                {
+                    parserTasks.Add(Task.Run(() =>
+                    {
+                        var word = ReadWord(w.Attributes["href"].Value);
+                        if (word != null)
+                        {
+                            wordQueue.Enqueue(word);
+                        }
+                    }));
+                }
+                Task.WaitAll(parserTasks.ToArray());
 
                 wordNodes = wordNodes.Skip(NUMBER_OF_CONCURRENT_PROCESSING_WORDS);
             } while (wordNodes.Count() > 0);
@@ -77,31 +118,6 @@ namespace CollectData
         {
             var word = ReadWord(href);
             if (word != null)
-            {
-                SaveWord(word);
-            }
-        }
-
-        private void GetAndSaveWords(IEnumerable<HtmlNode> wordNodes)
-        {
-            var parsedWords = new ConcurrentBag<Word>();
-            List<Task> parserTasks = new List<Task>();
-            foreach (var w in wordNodes)
-            {
-                parserTasks.Add(Task.Run(() =>
-                {
-                    var word = ReadWord(w.Attributes["href"].Value);
-                    if (word != null)
-                    {
-                        parsedWords.Add(word);
-                    }
-                }));
-            }
-
-            Task.WaitAll(parserTasks.ToArray());
-
-            // Save each word separately
-            foreach (var word in parsedWords)
             {
                 SaveWord(word);
             }
@@ -160,15 +176,27 @@ namespace CollectData
 
             try
             {
-                var word = new Word();
-
                 var htmlDoc = LoadPageWithTimeout(url, 1);
+
+                // Reload the page if it timed out or was not fully loaded
+                if (htmlDoc == null || htmlDoc.DocumentNode.SelectSingleNode("//div[@id='bodyContent']") == null)
+                {
+                    htmlDoc = LoadPageWithTimeout(url, 1);
+                }
+
                 if (htmlDoc == null)
                 {
                     logger.Log(GetType(), Level.Error, $"Loading page {url} timed out", null);
                     return null;
                 }
 
+                if (htmlDoc.DocumentNode.SelectSingleNode("//div[@id='bodyContent']") == null)
+                {
+                    logger.Log(GetType(), Level.Error, $"Page {url} was not fully loaded", null);
+                    return null;
+                }
+
+                var word = new Word();
                 var keywords = htmlDoc.DocumentNode.SelectNodes("//head/meta")
                     .FirstOrDefault(n => n.GetAttributeValue("name", null) == "keywords")
                     ?.GetAttributeValue("content", string.Empty);
@@ -270,7 +298,9 @@ namespace CollectData
                 return new List<Definition>() { ReadDefinition(wordClassNode, word, dictionary, wordClass) };
             }
 
-            return definitionNodes.Select(n => ReadDefinition(n, word, dictionary, wordClass));
+            // Add a where here because in some cases a definition content is null and this will cause the world not to be registed
+            // http://tratu.soha.vn/dict/en_vn/Absorbency
+            return definitionNodes.Select(n => ReadDefinition(n, word, dictionary, wordClass)).Where(d => !string.IsNullOrEmpty(d.Content));
         }
 
         private Definition ReadDefinition(HtmlNode definitionNode, Word word, Dictionary dictionary, WordClass wordClass)
@@ -406,17 +436,19 @@ namespace CollectData
             return relativeWordsNode.SelectNodes("./div").SelectMany(n =>
             {
                 string isSynonym = n.SelectSingleNode("./h3").InnerText;
-                return n.SelectNodes("./div").SelectMany(r =>
-                {
-                    string wordClass = r.SelectSingleNode("./h5").InnerText;
-                    var relativeWords = r.SelectNodes("./dl/dd/a").Select(a => a.InnerText);
-                    return relativeWords.Select(rw => new RelativeWord()
-                    {
-                        IsSynomym = isSynonym == "Từ đồng nghĩa",
-                        WordClass = wordClass,
-                        RelWord = rw
-                    });
-                });
+                // We need a where here because of words like http://tratu.soha.vn/dict/en_vn/Accident
+                // (No related words even though a related word entry exists)
+                return n.SelectNodes("./div").Where(r => r.SelectNodes("./dl/dd/a") != null).SelectMany(r =>
+                 {
+                     string wordClass = r.SelectSingleNode("./h5").InnerText;
+                     var relativeWords = r.SelectNodes("./dl/dd/a").Select(a => a.InnerText);
+                     return relativeWords.Select(rw => new RelativeWord()
+                     {
+                         IsSynomym = isSynonym == "Từ đồng nghĩa",
+                         WordClass = wordClass,
+                         RelWord = rw
+                     });
+                 });
             }).ToList();
         }
 
