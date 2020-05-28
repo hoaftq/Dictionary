@@ -123,7 +123,7 @@ namespace DataAccess.Migrations
                 {
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Content = table.Column<string>(maxLength: 1000, nullable: false),
+                    Content = table.Column<string>(nullable: false),
                     DictionaryId = table.Column<int>(nullable: false),
                     WordClassId = table.Column<int>(nullable: false),
                     WordId = table.Column<int>(nullable: false)
@@ -256,8 +256,7 @@ namespace DataAccess.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Word_Content",
                 table: "Word",
-                column: "Content",
-                unique: true);
+                column: "Content");
 
             migrationBuilder.CreateIndex(
                 name: "IX_WordForm_WordId",

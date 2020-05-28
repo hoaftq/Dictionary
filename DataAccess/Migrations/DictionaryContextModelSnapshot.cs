@@ -28,8 +28,7 @@ namespace DataAccess.Migrations
 
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasColumnType("nvarchar(1000)")
-                        .HasMaxLength(1000);
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("DictionaryId")
                         .HasColumnType("int");
@@ -212,8 +211,7 @@ namespace DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Content")
-                        .IsUnique();
+                    b.HasIndex("Content");
 
                     b.ToTable("Word");
                 });

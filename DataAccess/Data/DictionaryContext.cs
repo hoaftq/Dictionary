@@ -28,7 +28,7 @@ namespace DataAccess.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlServer(@"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Dictionary;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False");
+            optionsBuilder.UseSqlServer(@"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Dictionary;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite");
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -43,7 +43,7 @@ namespace DataAccess.Data
             });
             modelBuilder.Entity<Word>(b =>
             {
-                b.ToTable("Word").HasIndex(p => p.Content).IsUnique();
+                b.ToTable("Word").HasIndex(p => p.Content);//.IsUnique(); //TODO
                 b.Property(p => p.Content).HasMaxLength(200).IsRequired();
                 b.Property(p => p.Spelling).HasMaxLength(200);
                 b.Property(p => p.SpellingAudioUrl).HasMaxLength(1000);
@@ -52,7 +52,7 @@ namespace DataAccess.Data
             modelBuilder.Entity<Definition>(b =>
             {
                 b.ToTable("Definition");
-                b.Property(p => p.Content).HasMaxLength(1000).IsRequired();
+                b.Property(p => p.Content).IsRequired();
             });
             modelBuilder.Entity<Usage>(e =>
             {

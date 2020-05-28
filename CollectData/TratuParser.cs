@@ -16,7 +16,9 @@ namespace CollectData
 {
     class TratuParser
     {
-        private const int NUMBER_OF_CONCURRENT_PROCESSING_WORDS = 20;
+        private const int NumberOfConcurrentProcessingWords = 20;
+
+        private static readonly WordClass UnknownWordClass = new WordClass() { Name = "Unknown" };
 
         private static readonly ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
 
@@ -31,6 +33,23 @@ namespace CollectData
 
         public void Parse(string href = null)
         {
+            CancellationTokenSource tokenSource = new CancellationTokenSource();
+
+            // A thread to save ready words to database
+            // We need a foreground thread here (not a task), if not when the main thread finishes it will terminate the thread before saving data completely
+            var thread = new Thread(() =>
+            {
+                while (!tokenSource.Token.IsCancellationRequested)
+                {
+                    if (wordQueue.TryDequeue(out Word word))
+                    {
+                        SaveWord(word);
+                    }
+                }
+            });
+            thread.Start();
+
+
             if (href == null || href.EndsWith("/special:allpages", StringComparison.OrdinalIgnoreCase))
             {
                 var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
@@ -39,30 +58,10 @@ namespace CollectData
                 HtmlWeb htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
 
-                CancellationTokenSource tokenSource = new CancellationTokenSource();
-                var registerTask = Task.Run(() =>
-                {
-                    while (!tokenSource.Token.IsCancellationRequested)
-                    {
-                        if (wordQueue.TryDequeue(out Word word))
-                        {
-                            SaveWord(word);
-                        }
-                    }
-                }, tokenSource.Token);
-
                 foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
                 {
                     ParsePage(link.Attributes["href"].Value);
                 }
-
-                // All words has been processed
-                while (wordQueue.Count > 0)
-                {
-                }
-
-                // End the register task
-                tokenSource.Cancel();
             }
             else if (href.Contains("%C4%90%E1%BA%B7c_bi%E1%BB%87t:Allpages/", StringComparison.OrdinalIgnoreCase))
             {
@@ -72,6 +71,17 @@ namespace CollectData
             {
                 ParseWord(href);
             }
+
+            // All words has been processed
+            while (wordQueue.Count > 0)
+            {
+            }
+
+            // Signal to end the register thread
+            tokenSource.Cancel();
+
+            // Wait for register thread to end
+            thread.Join();
         }
 
         public void ParsePage(string href)
@@ -93,7 +103,7 @@ namespace CollectData
 
             do
             {
-                var consecutiveNodes = wordNodes.Take(NUMBER_OF_CONCURRENT_PROCESSING_WORDS);
+                var consecutiveNodes = wordNodes.Take(NumberOfConcurrentProcessingWords);
 
                 // Load a block of words at a time and wait for that to complete before moving to another block
                 List<Task> parserTasks = new List<Task>();
@@ -110,7 +120,7 @@ namespace CollectData
                 }
                 Task.WaitAll(parserTasks.ToArray());
 
-                wordNodes = wordNodes.Skip(NUMBER_OF_CONCURRENT_PROCESSING_WORDS);
+                wordNodes = wordNodes.Skip(NumberOfConcurrentProcessingWords);
             } while (wordNodes.Count() > 0);
         }
 
@@ -119,7 +129,7 @@ namespace CollectData
             var word = ReadWord(href);
             if (word != null)
             {
-                SaveWord(word);
+                wordQueue.Enqueue(word);
             }
         }
 
@@ -164,8 +174,10 @@ namespace CollectData
             catch (DbUpdateException ex)
             {
                 // The word could not be saved, remove it from the context
+                // TODO is this enough?
                 context.Words.Remove(word);
-                logger.Log(GetType(), Level.Error, $"Could not save word {word.Content} to database", ex);
+
+                logger.Log(GetType(), Level.Error, $"Could not save word '{word.Content}' to database", ex);
             }
         }
 
@@ -207,7 +219,7 @@ namespace CollectData
                 var spellingNode = children.Select(c => c.SelectSingleNode(".//font[@color='red']/text()"))
                     .Where(n => n != null)
                     .FirstOrDefault();
-                word.Spelling = spellingNode?.InnerText;
+                word.Spelling = spellingNode?.InnerText != "Phiên âm này đang chờ bạn hoàn thiện" ? spellingNode?.InnerText : null;
                 word.SpellingAudioUrl = null; // The audio link does not work anymore!
 
                 var dictionaryNodes = contentNode.SelectNodes("./div[@class='section-h2']");
@@ -228,7 +240,7 @@ namespace CollectData
                 word.WordForms = new List<WordForm>();
                 foreach (var d in dictionaryNodes)
                 {
-                    ReadDictionary(d, word);
+                    ReadDictionary(d, word, url);
                 }
 
                 return word;
@@ -240,7 +252,7 @@ namespace CollectData
             }
         }
 
-        private void ReadDictionary(HtmlNode dictionaryNode, Word word)
+        private void ReadDictionary(HtmlNode dictionaryNode, Word word, string url)
         {
             var dictionaryName = dictionaryNode.SelectSingleNode("./h2/span|./h3/span").InnerText;
 
@@ -270,12 +282,28 @@ namespace CollectData
                     word.Phases = ReadPhases(phasesNode, dictionary);
                 }
 
-                word.Definitions.AddRange(wordClassNodes.SelectMany(wc => ReadWordClass(wc, word, dictionary)));
+                var defs = wordClassNodes.SelectMany(wc => ReadWordClass(wc, word, dictionary));
+                word.Definitions.AddRange(defs);
             }
             else
             {
-                // TODO need to process here
-                logger.Log(GetType(), Level.Warn, "Could not get any word class node", null);
+                // This is for pages like http://tratu.soha.vn/dict/en_vn/Ablative_method, a lot of pages have this form
+                var defNodes = dictionaryNode.SelectNodes("./div[@class='section-h5']");
+                if (defNodes != null)
+                {
+                    var defs = defNodes.Select(d => new Definition()
+                    {
+                        Content = d.InnerText?.TrimAllSpecialCharacters(),
+                        Word = word,
+                        Dictionary = dictionary,
+                        WordClass = UnknownWordClass,
+                    });
+                    word.Definitions.AddRange(defs);
+                }
+                else
+                {
+                    logger.Log(GetType(), Level.Warn, $"Could not get any word class node at {url}", null);
+                }
             }
         }
 
@@ -314,7 +342,7 @@ namespace CollectData
             }
             var usageNodes = definitionNode.SelectNodes("./dl/dd/dl/dd")?.Select(u => u.InnerText).ToList();
 
-            Definition definition = new Definition()
+            var definition = new Definition()
             {
                 Content = definitionTextNode?.InnerText,
                 Word = word,
@@ -327,18 +355,18 @@ namespace CollectData
             {
                 if (usageNodes.Count % 2 != 0)
                 {
-                    logger.Log(GetType(), Level.Error, "Number of usages is an old number", null);
+                    // This is for pages like http://tratu.soha.vn/dict/en_vn/According, http://tratu.soha.vn/dict/en_vn/Acclimatization
+                    usageNodes.RemoveAt(0);
+                    logger.Log(GetType(), Level.Warn, "Number of usages is an old number, remove the first one", null);
                 }
-                else
+
+                for (int i = 0; i < usageNodes.Count / 2; i++)
                 {
-                    for (int i = 0; i < usageNodes.Count / 2; i++)
+                    definition.Usages.Add(new Usage()
                     {
-                        definition.Usages.Add(new Usage()
-                        {
-                            Sample = usageNodes[i * 2],
-                            Translation = usageNodes[i * 2 + 1]
-                        });
-                    }
+                        Sample = usageNodes[i * 2],
+                        Translation = usageNodes[i * 2 + 1]
+                    });
                 }
             }
 
@@ -471,7 +499,15 @@ namespace CollectData
             var task = Task.Run(() =>
             {
                 var htmlWeb = new HtmlWeb();
-                return htmlWeb.Load(url);
+                try
+                {
+                    return htmlWeb.Load(url);
+                }
+                catch (Exception ex)
+                {
+                    logger.Log(GetType(), Level.Error, $"An error occured while loading {url}", ex);
+                    return null;
+                }
             });
 
             if (task.Wait(TimeSpan.FromMinutes(timeoutInMinute)))
