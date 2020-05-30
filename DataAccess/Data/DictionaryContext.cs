@@ -1,5 +1,6 @@
 ﻿using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,7 +29,10 @@ namespace DataAccess.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlServer(@"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Dictionary;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite");
+            var configBuilder = new ConfigurationBuilder();
+            var config = configBuilder.AddJsonFile("appsettings.json", true).Build();
+
+            optionsBuilder.UseSqlServer(config["ConnectionString"]);
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

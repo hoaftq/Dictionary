@@ -26,6 +26,12 @@ namespace CollectData
 
         private readonly ConcurrentQueue<Word> wordQueue = new ConcurrentQueue<Word>();
 
+        private int totalPageCount = 0;
+
+        private int totalWordCount = 0;
+
+        private int successWordCount = 0;
+
         public TratuParser(DictionaryContext context)
         {
             this.context = context;
@@ -33,7 +39,7 @@ namespace CollectData
 
         public void Parse(string href = null)
         {
-            CancellationTokenSource tokenSource = new CancellationTokenSource();
+            var tokenSource = new CancellationTokenSource();
 
             // A thread to save ready words to database
             // We need a foreground thread here (not a task), if not when the main thread finishes it will terminate the thread before saving data completely
@@ -55,7 +61,7 @@ namespace CollectData
                 var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
                 logger.Log(GetType(), Level.Debug, $"Processing all pages at {url}", null);
 
-                HtmlWeb htmlWeb = new HtmlWeb();
+                var htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
 
                 foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
@@ -82,6 +88,8 @@ namespace CollectData
 
             // Wait for register thread to end
             thread.Join();
+
+            logger.Log(GetType(), Level.Info, $"{totalWordCount} words were read from {totalPageCount} pages, but only {successWordCount} were registered successfuly to database", null);
         }
 
         public void ParsePage(string href)
@@ -106,7 +114,7 @@ namespace CollectData
                 var consecutiveNodes = wordNodes.Take(NumberOfConcurrentProcessingWords);
 
                 // Load a block of words at a time and wait for that to complete before moving to another block
-                List<Task> parserTasks = new List<Task>();
+                var parserTasks = new List<Task>();
                 foreach (var w in consecutiveNodes)
                 {
                     parserTasks.Add(Task.Run(() =>
@@ -168,8 +176,13 @@ namespace CollectData
 
             try
             {
+                totalWordCount++;
+
                 context.Words.AddRange(word);
                 context.SaveChanges();
+
+                successWordCount++;
+                logger.Log(GetType(), Level.Debug, $"The word {word.Content} was registered successfully", null);
             }
             catch (DbUpdateException ex)
             {
@@ -185,6 +198,8 @@ namespace CollectData
         {
             var url = CreateFullUrl(href);
             logger.Log(GetType(), Level.Debug, $"Geting a new word at {url}", null);
+
+            Interlocked.Increment(ref totalPageCount);
 
             try
             {
