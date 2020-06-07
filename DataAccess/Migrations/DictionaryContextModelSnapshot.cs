@@ -30,7 +30,7 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("DictionaryId")
+                    b.Property<int>("SubDictionaryId")
                         .HasColumnType("int");
 
                     b.Property<int>("WordClassId")
@@ -41,30 +41,13 @@ namespace DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DictionaryId");
+                    b.HasIndex("SubDictionaryId");
 
                     b.HasIndex("WordClassId");
 
                     b.HasIndex("WordId");
 
                     b.ToTable("Definition");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.Dictionary", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(100)")
-                        .HasMaxLength(100);
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Dictionary");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Phase", b =>
@@ -79,7 +62,7 @@ namespace DataAccess.Migrations
                         .HasColumnType("nvarchar(2000)")
                         .HasMaxLength(2000);
 
-                    b.Property<int>("DictionaryId")
+                    b.Property<int>("SubDictionaryId")
                         .HasColumnType("int");
 
                     b.Property<int>("WordId")
@@ -87,7 +70,7 @@ namespace DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DictionaryId");
+                    b.HasIndex("SubDictionaryId");
 
                     b.HasIndex("WordId");
 
@@ -161,6 +144,26 @@ namespace DataAccess.Migrations
                     b.HasIndex("WordId");
 
                     b.ToTable("WordRelativeWord");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.SubDictionary", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
+                    b.Property<bool?>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(100)")
+                        .HasMaxLength(100);
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SubDictionary");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Usage", b =>
@@ -260,9 +263,9 @@ namespace DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.Definition", b =>
                 {
-                    b.HasOne("DataAccess.Models.Dictionary", "Dictionary")
+                    b.HasOne("DataAccess.Models.SubDictionary", "SubDictionary")
                         .WithMany()
-                        .HasForeignKey("DictionaryId")
+                        .HasForeignKey("SubDictionaryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -281,9 +284,9 @@ namespace DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.Phase", b =>
                 {
-                    b.HasOne("DataAccess.Models.Dictionary", "Dictionary")
+                    b.HasOne("DataAccess.Models.SubDictionary", "SubDictionary")
                         .WithMany()
-                        .HasForeignKey("DictionaryId")
+                        .HasForeignKey("SubDictionaryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

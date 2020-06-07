@@ -13,9 +13,9 @@ namespace DataAccess.Models
         public string Content { get; set; }
 
 
-        public int DictionaryId { get; set; }
+        public int SubDictionaryId { get; set; }
 
-        public Dictionary Dictionary { get; set; }
+        public SubDictionary SubDictionary { get; set; }
 
         public int WordClassId { get; set; }
 

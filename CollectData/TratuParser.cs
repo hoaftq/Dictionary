@@ -148,10 +148,10 @@ namespace CollectData
             {
                 foreach (var def in word.Definitions)
                 {
-                    var dic = context.Dictionaries.SingleOrDefault(d => d.Name == def.Dictionary.Name);
-                    if (dic != null)
+                    var subDic = context.SubDictionaries.SingleOrDefault(d => d.Name == def.SubDictionary.Name);
+                    if (subDic != null)
                     {
-                        def.Dictionary = dic;
+                        def.SubDictionary = subDic;
                     }
 
                     var wc = context.WordClasses.SingleOrDefault(w => w.Name == def.WordClass.Name);
@@ -166,10 +166,10 @@ namespace CollectData
             {
                 foreach (var p in word.Phases)
                 {
-                    var dic = context.Dictionaries.SingleOrDefault(d => d.Name == p.Dictionary.Name);
-                    if (dic != null)
+                    var subDic = context.SubDictionaries.SingleOrDefault(d => d.Name == p.SubDictionary.Name);
+                    if (subDic != null)
                     {
-                        p.Dictionary = dic;
+                        p.SubDictionary = subDic;
                     }
                 }
             }
@@ -237,23 +237,23 @@ namespace CollectData
                 word.Spelling = spellingNode?.InnerText != "Phiên âm này đang chờ bạn hoàn thiện" ? spellingNode?.InnerText : null;
                 word.SpellingAudioUrl = null; // The audio link does not work anymore!
 
-                var dictionaryNodes = contentNode.SelectNodes("./div[@class='section-h2']");
-                if (dictionaryNodes == null)
+                var subDictionaryNodes = contentNode.SelectNodes("./div[@class='section-h2']");
+                if (subDictionaryNodes == null)
                 {
                     logger.Log(GetType(), Level.Error, $"Could not find any dictionary node at {url}", null);
                     return null;
                 }
 
-                var relativeWordsNode = dictionaryNodes.SingleOrDefault(d => d.SelectSingleNode("./h2/span")?.InnerHtml.Contains("Các từ liên quan") == true);
+                var relativeWordsNode = subDictionaryNodes.SingleOrDefault(d => d.SelectSingleNode("./h2/span")?.InnerHtml.Contains("Các từ liên quan") == true);
                 if (relativeWordsNode != null)
                 {
-                    dictionaryNodes.Remove(relativeWordsNode);
+                    subDictionaryNodes.Remove(relativeWordsNode);
                     word.RelativeWords = ReadRelativeWords(relativeWordsNode);
                 }
 
                 word.Definitions = new List<Definition>();
                 word.WordForms = new List<WordForm>();
-                foreach (var d in dictionaryNodes)
+                foreach (var d in subDictionaryNodes)
                 {
                     ReadDictionary(d, word, url);
                 }
@@ -271,12 +271,13 @@ namespace CollectData
         {
             var dictionaryName = dictionaryNode.SelectSingleNode("./h2/span|./h3/span").InnerText;
 
-            Dictionary dictionary = null; // context.Dictionaries.Where(d => d.Name == dictionaryName).SingleOrDefault();
-            if (dictionary == null)
+            SubDictionary subDictionary = null; // context.Dictionaries.Where(d => d.Name == dictionaryName).SingleOrDefault();
+            if (subDictionary == null)
             {
-                dictionary = new Dictionary()
+                subDictionary = new SubDictionary()
                 {
-                    Name = dictionaryName
+                    Name = dictionaryName,
+                    IsPrimary = dictionaryName == "Thông dụng" ? true : (bool?)null
                 };
             }
 
@@ -294,10 +295,10 @@ namespace CollectData
                 if (phasesNode != null)
                 {
                     wordClassNodes.Remove(phasesNode);
-                    word.Phases = ReadPhases(phasesNode, dictionary);
+                    word.Phases = ReadPhases(phasesNode, subDictionary);
                 }
 
-                var defs = wordClassNodes.SelectMany(wc => ReadWordClass(wc, word, dictionary));
+                var defs = wordClassNodes.SelectMany(wc => ReadWordClass(wc, word, subDictionary));
                 word.Definitions.AddRange(defs);
             }
             else
@@ -310,7 +311,7 @@ namespace CollectData
                     {
                         Content = d.InnerText?.TrimAllSpecialCharacters(),
                         Word = word,
-                        Dictionary = dictionary,
+                        SubDictionary = subDictionary,
                         WordClass = UnknownWordClass,
                     });
                     word.Definitions.AddRange(defs);
@@ -322,7 +323,7 @@ namespace CollectData
             }
         }
 
-        private IEnumerable<Definition> ReadWordClass(HtmlNode wordClassNode, Word word, Dictionary dictionary)
+        private IEnumerable<Definition> ReadWordClass(HtmlNode wordClassNode, Word word, SubDictionary subDictionary)
         {
             string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText.TrimAllSpecialCharacters();
             WordClass wordClass = null; // context.WordClasses.SingleOrDefault(wc => wc.Name == wordClassText);
@@ -338,15 +339,15 @@ namespace CollectData
             if (definitionNodes == null)
             {
                 // Treat wordClassNode as a definiton node (http://tratu.soha.vn/dict/en_vn/Allegedly)
-                return new List<Definition>() { ReadDefinition(wordClassNode, word, dictionary, wordClass) };
+                return new List<Definition>() { ReadDefinition(wordClassNode, word, subDictionary, wordClass) };
             }
 
             // Add a where here because in some cases a definition content is null and this will cause the world not to be registed
             // http://tratu.soha.vn/dict/en_vn/Absorbency
-            return definitionNodes.Select(n => ReadDefinition(n, word, dictionary, wordClass)).Where(d => !string.IsNullOrEmpty(d.Content));
+            return definitionNodes.Select(n => ReadDefinition(n, word, subDictionary, wordClass)).Where(d => !string.IsNullOrEmpty(d.Content));
         }
 
-        private Definition ReadDefinition(HtmlNode definitionNode, Word word, Dictionary dictionary, WordClass wordClass)
+        private Definition ReadDefinition(HtmlNode definitionNode, Word word, SubDictionary subDictionary, WordClass wordClass)
         {
             var definitionTextNode = definitionNode.SelectSingleNode("./h5[1]/span");
 
@@ -361,7 +362,7 @@ namespace CollectData
             {
                 Content = definitionTextNode?.InnerText,
                 Word = word,
-                Dictionary = dictionary,
+                SubDictionary = subDictionary,
                 WordClass = wordClass,
                 Usages = new List<Usage>()
             };
@@ -388,13 +389,13 @@ namespace CollectData
             return definition;
         }
 
-        private List<Phase> ReadPhases(HtmlNode phasesNode, Dictionary dictionary)
+        private List<Phase> ReadPhases(HtmlNode phasesNode, SubDictionary subDictionary)
         {
             return phasesNode.SelectNodes("./div").Select(p =>
             {
                 var phase = new Phase()
                 {
-                    Dictionary = dictionary
+                    SubDictionary = subDictionary
                 };
 
                 var phaseContentNode = p.SelectSingleNode("./h5");

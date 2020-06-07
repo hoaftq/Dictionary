@@ -11,7 +11,7 @@ namespace DataAccess.Data
 {
     public class DictionaryContext : DbContext
     {
-        public DbSet<Dictionary> Dictionaries { get; set; }
+        public DbSet<SubDictionary> SubDictionaries { get; set; }
 
         public DbSet<WordClass> WordClasses { get; set; }
 
@@ -37,9 +37,9 @@ namespace DataAccess.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<Dictionary>(b =>
+            modelBuilder.Entity<SubDictionary>(b =>
             {
-                b.ToTable("Dictionary").Property(e => e.Name).HasMaxLength(100).IsRequired();
+                b.ToTable("SubDictionary").Property(e => e.Name).HasMaxLength(100).IsRequired();
             });
             modelBuilder.Entity<WordClass>(b =>
             {

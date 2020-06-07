@@ -7,16 +7,17 @@ namespace DataAccess.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "Dictionary",
+                name: "SubDictionary",
                 columns: table => new
                 {
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(maxLength: 100, nullable: false)
+                    Name = table.Column<string>(maxLength: 100, nullable: false),
+                    IsPrimary = table.Column<bool>(nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Dictionary", x => x.Id);
+                    table.PrimaryKey("PK_SubDictionary", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -54,16 +55,16 @@ namespace DataAccess.Migrations
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Content = table.Column<string>(maxLength: 2000, nullable: false),
-                    DictionaryId = table.Column<int>(nullable: false),
+                    SubDictionaryId = table.Column<int>(nullable: false),
                     WordId = table.Column<int>(nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Phase", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Phase_Dictionary_DictionaryId",
-                        column: x => x.DictionaryId,
-                        principalTable: "Dictionary",
+                        name: "FK_Phase_SubDictionary_SubDictionaryId",
+                        column: x => x.SubDictionaryId,
+                        principalTable: "SubDictionary",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -124,7 +125,7 @@ namespace DataAccess.Migrations
                     Id = table.Column<int>(nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Content = table.Column<string>(nullable: false),
-                    DictionaryId = table.Column<int>(nullable: false),
+                    SubDictionaryId = table.Column<int>(nullable: false),
                     WordClassId = table.Column<int>(nullable: false),
                     WordId = table.Column<int>(nullable: false)
                 },
@@ -132,9 +133,9 @@ namespace DataAccess.Migrations
                 {
                     table.PrimaryKey("PK_Definition", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Definition_Dictionary_DictionaryId",
-                        column: x => x.DictionaryId,
-                        principalTable: "Dictionary",
+                        name: "FK_Definition_SubDictionary_SubDictionaryId",
+                        column: x => x.SubDictionaryId,
+                        principalTable: "SubDictionary",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -214,9 +215,9 @@ namespace DataAccess.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Definition_DictionaryId",
+                name: "IX_Definition_SubDictionaryId",
                 table: "Definition",
-                column: "DictionaryId");
+                column: "SubDictionaryId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Definition_WordClassId",
@@ -229,9 +230,9 @@ namespace DataAccess.Migrations
                 column: "WordId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Phase_DictionaryId",
+                name: "IX_Phase_SubDictionaryId",
                 table: "Phase",
-                column: "DictionaryId");
+                column: "SubDictionaryId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Phase_WordId",
@@ -296,7 +297,7 @@ namespace DataAccess.Migrations
                 name: "WordClass");
 
             migrationBuilder.DropTable(
-                name: "Dictionary");
+                name: "SubDictionary");
 
             migrationBuilder.DropTable(
                 name: "Word");
