@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace Dictionary.Dtos.Word
+﻿namespace Dictionary.Dtos.Word
 {
     public class UsageDto
     {

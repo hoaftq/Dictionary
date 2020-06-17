@@ -142,7 +142,7 @@ namespace Dictionary.Controllers
                 RelativeWords = word.RelativeWords?.Select(rw => new RelativeWordDto()
                 {
                     Content = rw.RelWord,
-                    IsSynomym = rw.IsSynomym,
+                    IsSynonym = rw.IsSynomym,
                     WordClass = rw.WordClass
                 })
             };
