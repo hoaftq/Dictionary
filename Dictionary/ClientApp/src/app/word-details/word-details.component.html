@@ -1,1 +1,28 @@
-<p>word-details works!</p>
+<ng-container *ngIf="wordDto">
+  {{wordDto.content}}
+  {{wordDto.spelling}}
+  <div *ngFor="let sd of wordDto.subDictionaries">
+    <div *ngFor="let wc of sd.wordClasses">
+      <div class="font-weight-bold" style="color:darkblue">{{wc.name}}</div>
+      <ul class="list-unstyled">
+        <li *ngFor="let d of wc.definitions" class="ml-3">
+          <div>{{d.content}}</div>
+          <div *ngFor="let u of d.usages" class="ml-3">
+            <p style="color: blueviolet;">{{u.sample}}</p>
+            <p class="ml-1 small">{{u.translation}}</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div *ngFor="let p of sd.phases">
+
+    </div>
+  </div>
+  <div *ngFor="let wf of wordDto.wordForms">
+
+  </div>
+
+  <div *ngFor="let rw of wordDto.relativeWords">
+
+  </div>
+</ng-container>

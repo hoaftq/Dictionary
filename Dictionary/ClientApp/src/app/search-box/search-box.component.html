@@ -1,1 +1,11 @@
-<input type="text" class="w-100 form-control" (keypress)="onKeypress()" />
+<input type="text" class="w-100 form-control" (keyup)="onKeyup($event)" />
+<div class="position-absolute container" style="background-color:silver">
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4">
+    <div *ngFor="let sw of suggestionWords" class="col">
+      <p>{{sw.word}}</p>
+      <div *ngIf="sw.details && sw.details[0]">
+        {{sw.details[0].wordClass}}-{{sw.details[0].definition}}
+      </div>
+    </div>
+  </div>
+</div>

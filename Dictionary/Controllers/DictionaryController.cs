@@ -55,10 +55,12 @@ namespace Dictionary.Controllers
             }
 
             var foundWords = context.Words.Include(w => w.Definitions)
-                        .ThenInclude(d => d.SubDictionary)
-                        .Include(w => w.Definitions)
-                            .ThenInclude(d => d.WordClass)
-                         .Where(w => w.Content.StartsWith(word));
+                                              .ThenInclude(d => d.SubDictionary)
+                                          .Include(w => w.Definitions)
+                                              .ThenInclude(d => d.WordClass)
+                                          .Where(w => w.Content.StartsWith(word))
+                                          .OrderBy(w => w.Content.Length)
+                                          .Take(16);
 
             return foundWords?.Select(w => ModelToDto(w));
         }

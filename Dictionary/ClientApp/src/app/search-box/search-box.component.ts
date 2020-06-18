@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+import { DictionaryService, WordDto, SuggestionDto } from '../dictionary.service';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-search-box',
@@ -7,12 +9,18 @@ import { Component, OnInit } from '@angular/core';
 })
 export class SearchBoxComponent implements OnInit {
 
-  constructor() { }
+  suggestionWords: SuggestionDto[];
+
+  constructor(private dictService: DictionaryService) { }
 
   ngOnInit() {
   }
 
-  onKeypress() {
-
+  onKeyup(e: KeyboardEvent) {
+    const searchingWord = (e.target as HTMLInputElement).value;
+    this.dictService.searchWords(searchingWord).subscribe(ws => {
+      this.suggestionWords = ws;
+    });
   }
 }
+
