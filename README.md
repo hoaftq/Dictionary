@@ -23,3 +23,4 @@ This is a single-page-app dictionary which is responsive. Currently it supports 
 
    TODO list:
    - Developing
+   - Exception when getting the word Action, About

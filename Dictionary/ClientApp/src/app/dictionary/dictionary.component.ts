@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { EnteringWord } from '../search-box/search-box.component';
 
 @Component({
   selector: 'app-dictionary',
@@ -7,10 +8,20 @@ import { Component, OnInit } from '@angular/core';
 })
 export class DictionaryComponent implements OnInit {
 
+  word = '';
+
   constructor() { }
 
-  ngOnInit() {
+  ngOnInit() { }
+
+  onEnterWord(e: EnteringWord) {
+    if (e.firstSuggestion) {
+      this.word = e.firstSuggestion;
+    }
   }
 
+  onSelectWord(w: string) {
+    this.word = w;
+  }
 
 }

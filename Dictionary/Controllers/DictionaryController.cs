@@ -35,6 +35,7 @@ namespace Dictionary.Controllers
                                     .Include(w => w.Definitions)
                                         .ThenInclude(d => d.Usages)
                                     .Include(w => w.Phases)
+                                        .ThenInclude(p => p.Definitions)
                                     .Include(w => w.WordForms)
                                     .Include(w => w.RelativeWords)
                                     .FirstOrDefault(w => w.Content.Trim().ToLower() == word.Trim().ToLower());
@@ -112,7 +113,7 @@ namespace Dictionary.Controllers
                         Definitions = p.Definitions.Select(phaseDef => new DefinitionDto()
                         {
                             Content = phaseDef.Content,
-                            Usages = phaseDef.Usages.Select(pu => new UsageDto()
+                            Usages = phaseDef.Usages?.Select(pu => new UsageDto()
                             {
                                 Sample = pu.Sample,
                                 Translation = pu.Translation

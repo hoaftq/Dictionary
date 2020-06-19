@@ -1,0 +1,20 @@
+.suggestion-container {
+  background-color: white;
+  border: 1px solid lightblue;
+}
+
+.suggestion-content {
+  border: 1px solid lightblue;
+  padding: 5px;
+  height: 100%;
+}
+
+  .suggestion-content:hover {
+    background-color: lightblue;
+    cursor: pointer;
+  }
+
+.suggestion-word {
+  color: dodgerblue;
+  font-weight: bolder;
+}

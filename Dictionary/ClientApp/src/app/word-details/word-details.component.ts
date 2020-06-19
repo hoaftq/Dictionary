@@ -1,5 +1,5 @@
-import { Component, OnInit, Input } from '@angular/core';
-import { WordDto, DictionaryService } from '../dictionary.service';
+import { Component, Input, OnInit } from '@angular/core';
+import { DictionaryService, WordDto } from '../dictionary.service';
 
 @Component({
   selector: 'app-word-details',
@@ -8,17 +8,20 @@ import { WordDto, DictionaryService } from '../dictionary.service';
 })
 export class WordDetailsComponent implements OnInit {
 
-  @Input()
-  word: string;
-
   wordDto: WordDto;
+
+  @Input()
+  set word(value: string) {
+    if (!value) {
+      return;
+    }
+
+    this.dictService.getWordDetails(value).subscribe(w => {
+      this.wordDto = w;
+    });
+  }
 
   constructor(private dictService: DictionaryService) { }
 
-  ngOnInit() {
-    this.dictService.getWordDetails(this.word).subscribe(w => {
-      this.wordDto = w;
-      //alert(JSON.stringify(w));
-    });
-  }
+  ngOnInit() { }
 }
