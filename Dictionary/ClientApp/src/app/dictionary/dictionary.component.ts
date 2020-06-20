@@ -7,7 +7,6 @@ import { EnteringWord } from '../search-box/search-box.component';
   styleUrls: ['./dictionary.component.css']
 })
 export class DictionaryComponent implements OnInit {
-
   word = '';
 
   constructor() { }
@@ -23,5 +22,4 @@ export class DictionaryComponent implements OnInit {
   onSelectWord(w: string) {
     this.word = w;
   }
-
 }

@@ -7,7 +7,6 @@ import { DictionaryService, WordDto } from '../dictionary.service';
   styleUrls: ['./word-details.component.css']
 })
 export class WordDetailsComponent implements OnInit {
-
   wordDto: WordDto;
 
   @Input()

@@ -7,7 +7,6 @@ import { DictionaryService, SuggestionDto } from '../dictionary.service';
   styleUrls: ['./search-box.component.css']
 })
 export class SearchBoxComponent implements OnInit {
-
   suggestionWords: SuggestionDto[] = [];
 
   isVisible = false;
@@ -53,6 +52,7 @@ export class SearchBoxComponent implements OnInit {
     this.selectWord.emit(sw.word);
   }
 
+  // Hide the suggestion panel when user clicks anywhere
   @HostListener('window:click', ['$event'])
   onWindowClick(_e: MouseEvent) {
     this.isVisible = false;

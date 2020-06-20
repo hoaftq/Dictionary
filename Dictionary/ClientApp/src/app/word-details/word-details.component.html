@@ -1,6 +1,12 @@
 <ng-container *ngIf="wordDto">
-  <span class="mr-3 h4">{{wordDto.content}}</span>
-  <span style="color: deeppink">{{wordDto.spelling}}</span>
+  <div class="mt-2">
+    <span class="mr-3 h4">{{wordDto.content}}</span>
+    <span style="color: deeppink">{{wordDto.spelling}}</span>
+  </div>
+  <div *ngFor="let wf of wordDto.wordForms" class="ml-4">
+    <span class="mr-2">{{wf.formType}}</span>
+    <span style="color:blue">{{wf.content}}</span>
+  </div>
   <div *ngFor="let sd of wordDto.subDictionaries" class="mt-2">
     <div *ngFor="let wc of sd.wordClasses">
       <div class="h5" style="color:darkblue">{{wc.name}}</div>
@@ -39,12 +45,8 @@
       </li>
     </ul>
   </div>
-  <div *ngFor="let wf of wordDto.wordForms">
-    <span>{{wf.formType}}</span>
-    <span>{{wf.content}}</span>
-  </div>
 
-  <div *ngIf="wordDto.relativeWords && wordDto.relativeWords.length" class="font-weight-bold">Từ đồng nghĩa</div>
+  <div *ngIf="wordDto.relativeWords && wordDto.relativeWords.length" class="h5">Từ đồng nghĩa</div>
 
   <!--<div *ngIf="rw.isSynonym">{{rw.content}}</div>-->
   <div class="ml-3">
