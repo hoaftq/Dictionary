@@ -11,6 +11,7 @@ code {
 
 .btn-primary {
   color: #fff;
-  background-color: #1b6ec2;
+  /*background-color: #1b6ec2;*/
+  background-color: dodgerblue;
   border-color: #1861ac;
 }

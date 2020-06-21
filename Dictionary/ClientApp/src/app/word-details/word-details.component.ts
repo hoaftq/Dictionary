@@ -7,6 +7,7 @@ import { DictionaryService, WordDto } from '../dictionary.service';
   styleUrls: ['./word-details.component.css']
 })
 export class WordDetailsComponent implements OnInit {
+  _word: string;
   wordDto: WordDto;
 
   @Input()
@@ -16,6 +17,7 @@ export class WordDetailsComponent implements OnInit {
     }
 
     this.dictService.getWordDetails(value).subscribe(w => {
+      this._word = value;
       this.wordDto = w;
     });
   }

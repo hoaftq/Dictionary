@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +12,9 @@ export class DictionaryService {
 
   getWordDetails(word: string): Observable<WordDto> {
     const url = `api/Dictionary/${word}`;
-    return this.http.get<WordDto>(url);
+    return this.http.get<WordDto>(url).pipe(
+      catchError(err => of(null))
+    );
   }
 
   searchWords(word: string): Observable<SuggestionDto[]> {

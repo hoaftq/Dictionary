@@ -1,4 +1,4 @@
-import { Component, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 import { DictionaryService, SuggestionDto } from '../dictionary.service';
 
 @Component({
@@ -11,13 +11,14 @@ export class SearchBoxComponent implements OnInit {
 
   isVisible = false;
 
+  @Input()
   word = '';
 
   @Output()
   selectWord = new EventEmitter<string>();
 
   @Output()
-  enterWord = new EventEmitter<EnteringWord>();
+  search = new EventEmitter<EnteringWord>();
 
   constructor(private dictService: DictionaryService) { }
 
@@ -27,9 +28,9 @@ export class SearchBoxComponent implements OnInit {
   onEnterKeyup(e: KeyboardEvent) {
     this.isVisible = false;
     const searchingWord = (e.target as HTMLInputElement).value;
-    this.enterWord.emit({
-      word: searchingWord,
-      firstSuggestion: this.suggestionWords.length ? this.suggestionWords[0].word : ''
+    this.search.emit({
+      exactWord: searchingWord,
+      suggestionWord: this.suggestionWords.length ? this.suggestionWords[0].word : searchingWord
     });
   }
 
@@ -57,10 +58,17 @@ export class SearchBoxComponent implements OnInit {
   onWindowClick(_e: MouseEvent) {
     this.isVisible = false;
   }
+
+  onSearch(w: string) {
+    this.search.emit({
+      exactWord: w,
+      suggestionWord: w
+    });
+  }
 }
 
 export interface EnteringWord {
-  word: string;
-  firstSuggestion: string;
+  exactWord: string;
+  suggestionWord: string;
 }
 

@@ -1,4 +1,4 @@
-<ng-container *ngIf="wordDto">
+<ng-container *ngIf="wordDto; else emptyBlock">
   <div class="mt-2">
     <span class="mr-3 h4">{{wordDto.content}}</span>
     <span style="color: deeppink">{{wordDto.spelling}}</span>
@@ -48,11 +48,15 @@
 
   <div *ngIf="wordDto.relativeWords && wordDto.relativeWords.length" class="h5">Từ đồng nghĩa</div>
 
-  <!--<div *ngIf="rw.isSynonym">{{rw.content}}</div>-->
-  <div class="ml-3">
+  <!--<div *ngIf="rw.isSynonym">{rw.content}}</div>-->
+  <div class="ml-3 w-100 clearfix">
     <a *ngFor="let rw of wordDto.relativeWords"
-       [href]="'/' + rw.content"
-       class="m-1 p-1 border border-secondary rounded-pill text-decoration-none"
-       style="line-height: 35px;">{{rw.content}}</a>
+       [routerLink]="'/' + rw.content"
+       class="m-1 p-1 border rounded-pill bg-light text-decoration-none float-left">{{rw.content}}</a>
   </div>
 </ng-container>
+<ng-template #emptyBlock>
+  <div *ngIf="_word" class="mt-2">
+    <div class="mr-3 text-danger">Không tìm thấy <span class="h4">{{_word}}</span> trong từ điển </div>
+  </div>
+</ng-template>

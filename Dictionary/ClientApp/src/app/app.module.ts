@@ -22,7 +22,8 @@ import { WordDetailsComponent } from './word-details/word-details.component';
     HttpClientModule,
     FormsModule,
     RouterModule.forRoot([
-      { path: '', component: DictionaryComponent, pathMatch: 'full' }
+      { path: '', component: DictionaryComponent, pathMatch: 'full' },
+      { path: ':word', component: DictionaryComponent }
     ])
   ],
   providers: [],
