@@ -61,7 +61,7 @@ namespace Dictionary.Controllers
                                               .ThenInclude(d => d.WordClass)
                                           .Where(w => w.Content.StartsWith(word))
                                           .OrderBy(w => w.Content.Length)
-                                          .Take(16);
+                                          .Take(10);
 
             return foundWords?.Select(w => ModelToDto(w));
         }
