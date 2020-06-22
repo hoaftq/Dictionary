@@ -1,5 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { DictionaryService, WordDto } from '../dictionary.service';
+import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-word-details',
@@ -10,6 +11,8 @@ export class WordDetailsComponent implements OnInit {
   _word: string;
   wordDto: WordDto;
 
+  spelling;
+
   @Input()
   set word(value: string) {
     if (!value) {
@@ -19,10 +22,11 @@ export class WordDetailsComponent implements OnInit {
     this.dictService.getWordDetails(value).subscribe(w => {
       this._word = value;
       this.wordDto = w;
+      this.spelling = this.sanitize.bypassSecurityTrustHtml(w.spelling);
     });
   }
 
-  constructor(private dictService: DictionaryService) { }
+  constructor(private dictService: DictionaryService, private sanitize: DomSanitizer) { }
 
   ngOnInit() { }
 }

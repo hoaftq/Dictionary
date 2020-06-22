@@ -234,7 +234,8 @@ namespace CollectData
                 var spellingNode = children.Select(c => c.SelectSingleNode(".//font[@color='red']/text()"))
                     .Where(n => n != null)
                     .FirstOrDefault();
-                word.Spelling = spellingNode?.InnerText != "Phiên âm này đang chờ bạn hoàn thiện" ? spellingNode?.InnerText : null;
+                var spelling = spellingNode?.InnerText.TrimAllSpecialCharacters();
+                word.Spelling = spelling != "Phiên âm này đang chờ bạn hoàn thiện" ? spelling : null;
                 word.SpellingAudioUrl = null; // The audio link does not work anymore!
 
                 var subDictionaryNodes = contentNode.SelectNodes("./div[@class='section-h2']");
@@ -269,7 +270,7 @@ namespace CollectData
 
         private void ReadDictionary(HtmlNode dictionaryNode, Word word, string url)
         {
-            var dictionaryName = dictionaryNode.SelectSingleNode("./h2/span|./h3/span").InnerText;
+            var dictionaryName = dictionaryNode.SelectSingleNode("./h2/span|./h3/span").InnerText?.TrimAllSpecialCharacters();
 
             SubDictionary subDictionary = null; // context.Dictionaries.Where(d => d.Name == dictionaryName).SingleOrDefault();
             if (subDictionary == null)
@@ -325,7 +326,7 @@ namespace CollectData
 
         private IEnumerable<Definition> ReadWordClass(HtmlNode wordClassNode, Word word, SubDictionary subDictionary)
         {
-            string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText.TrimAllSpecialCharacters();
+            string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText?.TrimAllSpecialCharacters();
             WordClass wordClass = null; // context.WordClasses.SingleOrDefault(wc => wc.Name == wordClassText);
             if (wordClass == null)
             {
@@ -356,11 +357,11 @@ namespace CollectData
             {
                 definitionTextNode = definitionNode.SelectSingleNode("./h3[1]/span");
             }
-            var usageNodes = definitionNode.SelectNodes("./dl/dd/dl/dd")?.Select(u => u.InnerText).ToList();
+            var usageNodes = definitionNode.SelectNodes("./dl/dd/dl/dd")?.Select(u => u.InnerText?.TrimAllSpecialCharacters()).ToList();
 
             var definition = new Definition()
             {
-                Content = definitionTextNode?.InnerText,
+                Content = definitionTextNode?.InnerText?.TrimAllSpecialCharacters(),
                 Word = word,
                 SubDictionary = subDictionary,
                 WordClass = wordClass,
@@ -399,7 +400,7 @@ namespace CollectData
                 };
 
                 var phaseContentNode = p.SelectSingleNode("./h5");
-                phase.Content = phaseContentNode.InnerText?.Trim();
+                phase.Content = phaseContentNode.InnerText?.TrimAllSpecialCharacters();
 
                 var defNodes = p.SelectNodes("./dl/dd/dl/dd");
                 if (defNodes != null)
@@ -411,7 +412,7 @@ namespace CollectData
                     defNodes.Append(HtmlNode.CreateNode("dummy"));
                     foreach (HtmlNode d in defNodes)
                     {
-                        string defContent = d.SelectSingleNode("./text()")?.InnerText.TrimAllSpecialCharacters();
+                        string defContent = d.InnerText?.TrimAllSpecialCharacters();
                         var usageNodes = d.SelectNodes("./dl/dd");
 
                         if (!string.IsNullOrEmpty(defContent) || d.InnerHtml == "dummy")
@@ -436,14 +437,14 @@ namespace CollectData
                                 defs.Add(def);
                             }
 
-                            usageStrs = usageNodes?.Select(u => u.InnerText).ToList() ?? new List<string>();
+                            usageStrs = usageNodes?.Select(u => u.InnerText?.TrimAllSpecialCharacters()).ToList() ?? new List<string>();
                             prevDefContent = defContent;
                         }
                         else
                         {
                             if (usageNodes != null)
                             {
-                                usageStrs.AddRange(usageNodes.Select(u => u.InnerText));
+                                usageStrs.AddRange(usageNodes.Select(u => u.InnerText?.TrimAllSpecialCharacters()));
                             }
                         }
                     }
@@ -469,7 +470,7 @@ namespace CollectData
             {
                 return new WordForm()
                 {
-                    FormType = wf.SelectSingleNode("./text()").InnerHtml.TrimAllSpecialCharacters(),
+                    FormType = wf.SelectSingleNode("./text()").InnerHtml?.TrimAllSpecialCharacters(),
                     Content = wf.SelectSingleNode("./a").InnerHtml
                 };
             }).ToList();
@@ -479,16 +480,16 @@ namespace CollectData
         {
             return relativeWordsNode.SelectNodes("./div").SelectMany(n =>
             {
-                string isSynonym = n.SelectSingleNode("./h3").InnerText;
+                string isSynonym = n.SelectSingleNode("./h3").InnerText?.TrimAllSpecialCharacters();
                 // We need a where here because of words like http://tratu.soha.vn/dict/en_vn/Accident
                 // (No related words even though a related word entry exists)
                 return n.SelectNodes("./div").Where(r => r.SelectNodes("./dl/dd/a") != null).SelectMany(r =>
                  {
-                     string wordClass = r.SelectSingleNode("./h5").InnerText;
-                     var relativeWords = r.SelectNodes("./dl/dd/a").Select(a => a.InnerText);
+                     string wordClass = r.SelectSingleNode("./h5").InnerText?.TrimAllSpecialCharacters();
+                     var relativeWords = r.SelectNodes("./dl/dd/a").Select(a => a.InnerText?.TrimAllSpecialCharacters());
                      return relativeWords.Select(rw => new RelativeWord()
                      {
-                         IsSynomym = isSynonym == "Từ đồng nghĩa",
+                         IsSynomym = isSynonym?.Contains("Từ đồng nghĩa") ?? false,
                          WordClass = wordClass,
                          RelWord = rw
                      });

@@ -1,15 +1,15 @@
 <ng-container *ngIf="wordDto; else emptyBlock">
   <div class="mt-2">
     <span class="mr-3 h4">{{wordDto.content}}</span>
-    <span class="text-deeppink">{{wordDto.spelling}}</span>
+    <span class="text-deeppink" [innerHTML]="spelling"></span>
   </div>
   <div *ngFor="let wf of wordDto.wordForms" class="ml-4">
     <span class="mr-2">{{wf.formType}}</span>
-    <span class="text-blue">{{wf.content}}</span>
+    <a [routerLink]="['/', wf.content]" class="text-decoration-none">{{wf.content}}</a>
   </div>
   <div *ngFor="let sd of wordDto.subDictionaries" class="mt-2">
     <div *ngFor="let wc of sd.wordClasses">
-      <div class="h5 text-darkblue">{{wc.name}}</div>
+      <div class="h5 text-darkblue">{{wc.name != 'Unknown' ? wc.name : 'Other'}}</div>
       <ul class="list-unstyled">
         <li *ngFor="let d of wc.definitions" class="ml-3">
           <div>

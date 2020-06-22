@@ -24,3 +24,6 @@ This is a single-page-app dictionary which is responsive. Currently it supports 
    TODO list:
    - Developing
    - Exception when getting the word Action, About
+   - use a pipe for spelling html
+   - / in searching words
+   - add a spinner
