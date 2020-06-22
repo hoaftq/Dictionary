@@ -32,12 +32,16 @@ namespace CollectData
 
         private int successWordCount = 0;
 
+        private CancellationState cancellationState;
+
+        private CancellationState resumeState;
+
         public TratuParser(DictionaryContext context)
         {
             this.context = context;
         }
 
-        public void Parse(string href = null)
+        public void Parse(string href = null, CancellationToken? parserToken = null)
         {
             var tokenSource = new CancellationTokenSource();
 
@@ -58,15 +62,57 @@ namespace CollectData
 
             if (href == null || href.EndsWith("/special:allpages", StringComparison.OrdinalIgnoreCase))
             {
+                // If there is a saved file, the process will start over from the state in this file
+                // So if we want to process from the begining, the saved file has to be deleted
+                resumeState = CancellationUtil.Restore();
+
                 var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
                 logger.Log(GetType(), Level.Debug, $"Processing all pages at {url}", null);
 
                 var htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
 
+                bool isReachedCancellationPage = false;
                 foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
                 {
-                    ParsePage(link.Attributes["href"].Value);
+                    var pageUrl = link.Attributes["href"].Value;
+                    if (resumeState != null && !isReachedCancellationPage)
+                    {
+                        // Reach the stopped page, turn the flag to on so that all the following pages will be proccessed
+                        if (pageUrl == resumeState.PageUrl)
+                        {
+                            isReachedCancellationPage = true;
+                        }
+                        else
+                        {
+                            // Ignore pages before saved page
+                            logger.Log(GetType(), Level.Info, $"Ignored page {pageUrl}", null);
+                            continue;
+                        }
+                    }
+
+                    // Parser is requested to stop
+                    if (parserToken?.IsCancellationRequested ?? false)
+                    {
+                        // Just need to save the state if it's canceled at a later point
+                        if (resumeState == null || isReachedCancellationPage)
+                        {
+                            cancellationState = new CancellationState()
+                            {
+                                PageUrl = pageUrl
+                            };
+                            logger.Log(GetType(), Level.Info, $"Process is being cancelled at {cancellationState.PageUrl}", null);
+                        }
+                        break;
+                    }
+
+                    ParsePage(pageUrl, parserToken);
+
+                    // Parser is requested to stop
+                    if (parserToken?.IsCancellationRequested ?? false)
+                    {
+                        break;
+                    }
                 }
             }
             else if (href.Contains("%C4%90%E1%BA%B7c_bi%E1%BB%87t:Allpages/", StringComparison.OrdinalIgnoreCase))
@@ -89,10 +135,16 @@ namespace CollectData
             // Wait for register thread to end
             thread.Join();
 
+            // Only save the state if there is a cancellation
+            if (cancellationState != null)
+            {
+                CancellationUtil.Save(cancellationState);
+            }
+
             logger.Log(GetType(), Level.Info, $"{totalWordCount} words were read from {totalPageCount} pages, but only {successWordCount} were registered successfuly to database", null);
         }
 
-        public void ParsePage(string href)
+        public void ParsePage(string href, CancellationToken? parserToken = null)
         {
             var url = CreateFullUrl(href);
             logger.Log(GetType(), Level.Debug, $"Processing a page at {url}", null);
@@ -109,8 +161,40 @@ namespace CollectData
 
             IEnumerable<HtmlNode> wordNodes = htmlDoc.DocumentNode.SelectNodes("//div[@id='bodyContent']/table[2]//td/a");
 
+            bool isReachedCancellationWord = false;
             do
             {
+                var firstWordUrl = wordNodes.First().Attributes["href"].Value;
+                if (resumeState?.WordUrl != null && !isReachedCancellationWord)
+                {
+                    if (firstWordUrl == resumeState.WordUrl)
+                    {
+                        isReachedCancellationWord = true;
+                    }
+                    else
+                    {
+                        logger.Log(GetType(), Level.Info, $"Ignored a block of {NumberOfConcurrentProcessingWords} words starting at {firstWordUrl}", null);
+                        wordNodes = wordNodes.Skip(NumberOfConcurrentProcessingWords);
+                        continue;
+                    }
+                }
+
+                // Parser is requested to stop
+                if (parserToken?.IsCancellationRequested ?? false)
+                {
+                    if (resumeState?.WordUrl == null || isReachedCancellationWord)
+                    {
+                        cancellationState = new CancellationState()
+                        {
+                            PageUrl = href,
+                            WordUrl = wordNodes.First().Attributes["href"].Value
+                        };
+                        logger.Log(GetType(), Level.Info, $"Process is being cancelled at {cancellationState.PageUrl}, {cancellationState.WordUrl}", null);
+                    }
+
+                    break;
+                }
+
                 var consecutiveNodes = wordNodes.Take(NumberOfConcurrentProcessingWords);
 
                 // Load a block of words at a time and wait for that to complete before moving to another block
@@ -484,16 +568,16 @@ namespace CollectData
                 // We need a where here because of words like http://tratu.soha.vn/dict/en_vn/Accident
                 // (No related words even though a related word entry exists)
                 return n.SelectNodes("./div").Where(r => r.SelectNodes("./dl/dd/a") != null).SelectMany(r =>
-                 {
-                     string wordClass = r.SelectSingleNode("./h5").InnerText?.TrimAllSpecialCharacters();
-                     var relativeWords = r.SelectNodes("./dl/dd/a").Select(a => a.InnerText?.TrimAllSpecialCharacters());
-                     return relativeWords.Select(rw => new RelativeWord()
-                     {
-                         IsSynomym = isSynonym?.Contains("Từ đồng nghĩa") ?? false,
-                         WordClass = wordClass,
-                         RelWord = rw
-                     });
-                 });
+                {
+                    string wordClass = r.SelectSingleNode("./h5").InnerText?.TrimAllSpecialCharacters();
+                    var relativeWords = r.SelectNodes("./dl/dd/a").Select(a => a.InnerText?.TrimAllSpecialCharacters());
+                    return relativeWords.Select(rw => new RelativeWord()
+                    {
+                        IsSynomym = isSynonym?.Contains("Từ đồng nghĩa") ?? false,
+                        WordClass = wordClass,
+                        RelWord = rw
+                    });
+                });
             }).ToList();
         }
 
