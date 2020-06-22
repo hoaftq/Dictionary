@@ -10,6 +10,7 @@ namespace CollectData
 {
     class Program
     {
+        private static readonly ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), nameof(Program));
         private static readonly CancellationTokenSource cancellationParserSource = new CancellationTokenSource();
 
         static void Main(string[] args)
@@ -29,6 +30,8 @@ namespace CollectData
         {
             // Request to cancel the parser
             cancellationParserSource.Cancel();
+
+            logger.Log(typeof(Program), Level.Info, "Requested to cancel the process", null);
 
             // Prevent the app from being closed to wait for the remaining process
             e.Cancel = true;

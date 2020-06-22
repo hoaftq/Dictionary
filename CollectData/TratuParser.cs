@@ -36,6 +36,10 @@ namespace CollectData
 
         private CancellationState resumeState;
 
+        bool isReachedCancellationPage = false;
+
+        bool isReachedCancellationWord = false;
+
         public TratuParser(DictionaryContext context)
         {
             this.context = context;
@@ -72,7 +76,6 @@ namespace CollectData
                 var htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
 
-                bool isReachedCancellationPage = false;
                 foreach (var link in htmlDoc.DocumentNode.SelectNodes("//table[@class='allpageslist']/tr/td[1]/a[@href]"))
                 {
                     var pageUrl = link.Attributes["href"].Value;
@@ -141,7 +144,7 @@ namespace CollectData
                 CancellationUtil.Save(cancellationState);
             }
 
-            logger.Log(GetType(), Level.Info, $"{totalWordCount} words were read from {totalPageCount} pages, but only {successWordCount} were registered successfuly to database", null);
+            logger.Log(GetType(), Level.Info, $"{totalWordCount} words were read from {totalPageCount} pages, {successWordCount} words were registered successfuly to database", null);
         }
 
         public void ParsePage(string href, CancellationToken? parserToken = null)
@@ -161,7 +164,6 @@ namespace CollectData
 
             IEnumerable<HtmlNode> wordNodes = htmlDoc.DocumentNode.SelectNodes("//div[@id='bodyContent']/table[2]//td/a");
 
-            bool isReachedCancellationWord = false;
             do
             {
                 var firstWordUrl = wordNodes.First().Attributes["href"].Value;
