@@ -1,4 +1,4 @@
-<ng-container *ngIf="wordDto; else emptyBlock">
+<ng-container *ngIf="wordDto">
   <div class="mt-2">
     <span class="mr-3 h4">{{wordDto.content}}</span>
     <span class="text-deeppink" [innerHTML]="spelling"></span>
@@ -47,16 +47,21 @@
   </div>
 
   <div *ngIf="wordDto.relativeWords && wordDto.relativeWords.length" class="h5">Từ đồng nghĩa</div>
-
-  <!--<div *ngIf="rw.isSynonym">{rw.content}}</div>-->
   <div class="ml-3 clearfix">
-    <a *ngFor="let rw of wordDto.relativeWords"
-       [routerLink]="'/' + rw.content"
-       class="m-1 p-1 border rounded-pill bg-light text-decoration-none float-left text-blueviolet">{{rw.content}}</a>
+    <ng-container *ngFor="let rw of wordDto.relativeWords">
+      <a *ngIf="rw.isSynonym"
+         [routerLink]="'/' + rw.content"
+         class="m-1 p-1 border rounded-pill bg-light text-decoration-none float-left text-blueviolet">
+        {{rw.content}}
+      </a>
+    </ng-container>
   </div>
 </ng-container>
-<ng-template #emptyBlock>
-  <div *ngIf="_word" class="mt-2">
-    <div class="mr-3 text-danger">Could not find <span class="h4">{{_word}}</span> in the dictionary </div>
+
+<div *ngIf="isSearching" class="d-flex justify-content-center mt-2">
+  <div class="spinner-border text-primary square-40" role="status">
   </div>
-</ng-template>
+</div>
+<div *ngIf="errorDto?.code === 404" class="mt-2">
+  <div class="mr-3 text-danger">Could not find <span class="h4">{{searchWord}}</span> in the dictionary </div>
+</div>

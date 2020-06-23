@@ -18,6 +18,8 @@ namespace CollectData
     {
         private const int NumberOfConcurrentProcessingWords = 20;
 
+        private const int NumberOfConcurrentSavingWords = 20;
+
         private static readonly WordClass UnknownWordClass = new WordClass() { Name = "Unknown" };
 
         private static readonly ILogger logger = LoggerManager.GetLogger(Assembly.GetEntryAssembly(), typeof(TratuParser));
@@ -36,9 +38,9 @@ namespace CollectData
 
         private CancellationState resumeState;
 
-        bool isReachedCancellationPage = false;
+        private bool isReachedCancellationPage = false;
 
-        bool isReachedCancellationWord = false;
+        private bool isReachedCancellationWord = false;
 
         public TratuParser(DictionaryContext context)
         {
@@ -55,9 +57,21 @@ namespace CollectData
             {
                 while (!tokenSource.Token.IsCancellationRequested)
                 {
-                    if (wordQueue.TryDequeue(out Word word))
+                    var words = new List<Word>();
+                    for (int i = 0; i < NumberOfConcurrentSavingWords; i++)
                     {
-                        SaveWord(word);
+                        if (!wordQueue.TryDequeue(out Word word))
+                        {
+                            break;
+                        }
+
+                        words.Add(word);
+                    }
+
+                    // Save many words at the same time to improve performance
+                    if (words.Count > 0)
+                    {
+                        SaveWords(words);
                     }
                 }
             });
@@ -227,56 +241,59 @@ namespace CollectData
             }
         }
 
-        private void SaveWord(Word word)
+        private void SaveWords(List<Word> words)
         {
-            // If a dictionary or a word class already exists then use it, do not create a new one
-            if (word.Definitions != null)
+            foreach (var word in words)
             {
-                foreach (var def in word.Definitions)
+                // If a dictionary or a word class already exists then use it, do not create a new one
+                if (word.Definitions != null)
                 {
-                    var subDic = context.SubDictionaries.SingleOrDefault(d => d.Name == def.SubDictionary.Name);
-                    if (subDic != null)
+                    foreach (var def in word.Definitions)
                     {
-                        def.SubDictionary = subDic;
-                    }
+                        var subDict = context.SubDictionaries.SingleOrDefault(d => d.Name == def.SubDictionary.Name);
+                        if (subDict != null)
+                        {
+                            def.SubDictionary = subDict;
+                        }
 
-                    var wc = context.WordClasses.SingleOrDefault(w => w.Name == def.WordClass.Name);
-                    if (wc != null)
-                    {
-                        def.WordClass = wc;
+                        var wc = context.WordClasses.SingleOrDefault(w => w.Name == def.WordClass.Name);
+                        if (wc != null)
+                        {
+                            def.WordClass = wc;
+                        }
                     }
                 }
-            }
 
-            if (word.Phases != null)
-            {
-                foreach (var p in word.Phases)
+                if (word.Phases != null)
                 {
-                    var subDic = context.SubDictionaries.SingleOrDefault(d => d.Name == p.SubDictionary.Name);
-                    if (subDic != null)
+                    foreach (var p in word.Phases)
                     {
-                        p.SubDictionary = subDic;
+                        var subDict = context.SubDictionaries.SingleOrDefault(d => d.Name == p.SubDictionary.Name);
+                        if (subDict != null)
+                        {
+                            p.SubDictionary = subDict;
+                        }
                     }
                 }
             }
 
             try
             {
-                totalWordCount++;
+                totalWordCount += words.Count;
 
-                context.Words.AddRange(word);
+                context.Words.AddRange(words);
                 context.SaveChanges();
 
-                successWordCount++;
-                logger.Log(GetType(), Level.Debug, $"The word {word.Content} was registered successfully", null);
+                successWordCount += words.Count;
+                logger.Log(GetType(), Level.Debug, $"The words '{string.Join(", ", words.Select(w => w.Content))}' were registered successfully", null);
             }
             catch (DbUpdateException ex)
             {
                 // The word could not be saved, remove it from the context
                 // TODO is this enough?
-                context.Words.Remove(word);
+                context.Words.RemoveRange(words);
 
-                logger.Log(GetType(), Level.Error, $"Could not save word '{word.Content}' to database", ex);
+                logger.Log(GetType(), Level.Error, $"Could not save words '{string.Join(", ", words.Select(w => w.Content))}' to database", ex);
             }
         }
 

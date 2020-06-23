@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { DictionaryService, WordDto } from '../dictionary.service';
+import { DictionaryService, WordDto, ErrorDto } from '../dictionary.service';
 import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
@@ -8,10 +8,10 @@ import { DomSanitizer } from '@angular/platform-browser';
   styleUrls: ['./word-details.component.css']
 })
 export class WordDetailsComponent implements OnInit {
-  _word: string;
+  searchWord: string;
   wordDto: WordDto;
-
-  spelling;
+  errorDto: ErrorDto;
+  isSearching: boolean;
 
   @Input()
   set word(value: string) {
@@ -19,11 +19,29 @@ export class WordDetailsComponent implements OnInit {
       return;
     }
 
-    this.dictService.getWordDetails(value).subscribe(w => {
-      this._word = value;
-      this.wordDto = w;
-      this.spelling = this.sanitize.bypassSecurityTrustHtml(w.spelling);
+    // Reset status before searching
+    this.isSearching = true;
+    this.searchWord = value;
+    this.wordDto = null;
+    this.errorDto = null;
+
+    this.dictService.getWordDetails(encodeURIComponent(value)).subscribe(w => {
+
+      // Found a word
+      if ((<WordDto>w).content) {
+        this.wordDto = w as WordDto;
+      } else {
+
+        // An error occured
+        this.errorDto = w as ErrorDto;
+      }
+
+      this.isSearching = false;
     });
+  }
+
+  get spelling() {
+    return this.sanitize.bypassSecurityTrustHtml(this.wordDto ? this.wordDto.spelling : '');
   }
 
   constructor(private dictService: DictionaryService, private sanitize: DomSanitizer) { }

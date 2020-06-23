@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
+using System.Web;
 
 namespace Dictionary.Controllers
 {
@@ -27,6 +28,8 @@ namespace Dictionary.Controllers
             {
                 return BadRequest();
             }
+
+            word = HttpUtility.UrlDecode(word);
 
             var foundWord = context.Words.Include(w => w.Definitions)
                                     .ThenInclude(d => d.SubDictionary)

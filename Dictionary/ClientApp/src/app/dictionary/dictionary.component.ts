@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { EnteringWord } from '../search-box/search-box.component';
 import { ActivatedRoute, Router } from '@angular/router';
+import { EnteringWord } from '../search-box/search-box.component';
 
 @Component({
   selector: 'app-dictionary',
@@ -14,19 +14,20 @@ export class DictionaryComponent implements OnInit {
 
   ngOnInit() {
     this.route.paramMap.subscribe(ps => {
-      this.word = ps.get('word');
+      const w = ps.get('word');
+      this.word = w ? decodeURIComponent(w) : w;
     });
   }
 
   // A word is entered in the search box
   onSearchWord(e: EnteringWord) {
     if (e.suggestionWord) {
-      this.router.navigate([`/${e.suggestionWord}`]);
+      this.router.navigate([`/${encodeURIComponent(e.suggestionWord)}`]);
     }
   }
 
   // A word is selected in the suggestion panel
   onSelectWord(w: string) {
-    this.router.navigate([`/${w}`]);
+    this.router.navigate([`/${encodeURIComponent(w)}`]);
   }
 }
