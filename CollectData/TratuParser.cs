@@ -18,7 +18,7 @@ namespace CollectData
     {
         private const int NumberOfConcurrentProcessingWords = 20;
 
-        private const int NumberOfConcurrentSavingWords = 20;
+        private const int NumberOfConcurrentSavingWords = 1000;
 
         private static readonly WordClass UnknownWordClass = new WordClass() { Name = "Unknown" };
 
@@ -85,7 +85,7 @@ namespace CollectData
                 resumeState = CancellationUtil.Restore();
 
                 var url = "http://tratu.soha.vn/dict/en_vn/special:allpages";
-                logger.Log(GetType(), Level.Debug, $"Processing all pages at {url}", null);
+                logger.Log(GetType(), Level.Info, $"Processing all pages at {url}", null);
 
                 var htmlWeb = new HtmlWeb();
                 var htmlDoc = htmlWeb.Load(url);
@@ -164,7 +164,7 @@ namespace CollectData
         public void ParsePage(string href, CancellationToken? parserToken = null)
         {
             var url = CreateFullUrl(href);
-            logger.Log(GetType(), Level.Debug, $"Processing a page at {url}", null);
+            logger.Log(GetType(), Level.Info, $"Processing a page at {url}", null);
 
             var htmlDoc = LoadPageWithTimeout(url, 1);
             if (htmlDoc == null)
@@ -243,6 +243,47 @@ namespace CollectData
 
         private void SaveWords(List<Word> words)
         {
+            var subDictionaries = new List<SubDictionary>();
+            var wordClasses = new List<WordClass>();
+
+            SubDictionary GetExistedSubDictionary(SubDictionary subDict)
+            {
+                var reusedSubDict = subDictionaries.SingleOrDefault(s => s.Name == subDict.Name);
+                if (reusedSubDict != null)
+                {
+                    return reusedSubDict;
+                }
+
+                reusedSubDict = context.SubDictionaries.SingleOrDefault(s => s.Name == subDict.Name);
+                if (reusedSubDict != null)
+                {
+                    subDictionaries.Add(reusedSubDict);
+                    return reusedSubDict;
+                }
+
+                subDictionaries.Add(subDict);
+                return subDict;
+            }
+
+            WordClass GetExistedWordClass(WordClass wordClass)
+            {
+                var reusedWordClass = wordClasses.SingleOrDefault(w => w.Name == wordClass.Name);
+                if (reusedWordClass != null)
+                {
+                    return reusedWordClass;
+                }
+
+                reusedWordClass = context.WordClasses.SingleOrDefault(w => w.Name == wordClass.Name);
+                if (reusedWordClass != null)
+                {
+                    wordClasses.Add(reusedWordClass);
+                    return reusedWordClass;
+                }
+
+                wordClasses.Add(wordClass);
+                return wordClass;
+            }
+
             foreach (var word in words)
             {
                 // If a dictionary or a word class already exists then use it, do not create a new one
@@ -250,17 +291,8 @@ namespace CollectData
                 {
                     foreach (var def in word.Definitions)
                     {
-                        var subDict = context.SubDictionaries.SingleOrDefault(d => d.Name == def.SubDictionary.Name);
-                        if (subDict != null)
-                        {
-                            def.SubDictionary = subDict;
-                        }
-
-                        var wc = context.WordClasses.SingleOrDefault(w => w.Name == def.WordClass.Name);
-                        if (wc != null)
-                        {
-                            def.WordClass = wc;
-                        }
+                        def.SubDictionary = GetExistedSubDictionary(def.SubDictionary);
+                        def.WordClass = GetExistedWordClass(def.WordClass);
                     }
                 }
 
@@ -268,11 +300,7 @@ namespace CollectData
                 {
                     foreach (var p in word.Phases)
                     {
-                        var subDict = context.SubDictionaries.SingleOrDefault(d => d.Name == p.SubDictionary.Name);
-                        if (subDict != null)
-                        {
-                            p.SubDictionary = subDict;
-                        }
+                        p.SubDictionary = GetExistedSubDictionary(p.SubDictionary);
                     }
                 }
             }
@@ -285,22 +313,38 @@ namespace CollectData
                 context.SaveChanges();
 
                 successWordCount += words.Count;
-                logger.Log(GetType(), Level.Debug, $"The words '{string.Join(", ", words.Select(w => w.Content))}' were registered successfully", null);
+                logger.Log(GetType(), Level.Info, $"{words.Count} words '{string.Join(", ", words.Select(w => w.Content))}' were registered successfully", null);
             }
-            catch (DbUpdateException ex)
+            catch (DbUpdateException)
             {
                 // The word could not be saved, remove it from the context
                 // TODO is this enough?
                 context.Words.RemoveRange(words);
 
-                logger.Log(GetType(), Level.Error, $"Could not save words '{string.Join(", ", words.Select(w => w.Content))}' to database", ex);
+                // Try to register each word separately
+                foreach (var word in words)
+                {
+                    try
+                    {
+                        context.Words.Add(word);
+                        context.SaveChanges();
+
+                        successWordCount++;
+                        logger.Log(GetType(), Level.Info, $"The word '{word.Content}' was registered successfully", null);
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        context.Words.Remove(word);
+                        logger.Log(GetType(), Level.Error, $"Could not save the word '{word.Content}' to database", ex);
+                    }
+                }
             }
         }
 
         private Word ReadWord(string href)
         {
             var url = CreateFullUrl(href);
-            logger.Log(GetType(), Level.Debug, $"Geting a new word at {url}", null);
+            logger.Log(GetType(), Level.Info, $"Geting a new word at {url}", null);
 
             Interlocked.Increment(ref totalPageCount);
 

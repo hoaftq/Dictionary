@@ -17,6 +17,7 @@ namespace CollectData
         {
             Console.CancelKeyPress += Console_CancelKeyPress;
             AppDomain.CurrentDomain.ProcessExit += App_ProcessExit;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
             var defaultRepository = LoggerManager.GetRepository(Assembly.GetEntryAssembly());
             XmlConfigurator.Configure(defaultRepository, new FileInfo(AppDomain.CurrentDomain.BaseDirectory + "log4net.config"));
@@ -24,6 +25,11 @@ namespace CollectData
             using var context = new DictionaryContext();
             string url = args.Length > 0 ? args[0] : null;
             new TratuParser(context).Parse(url, cancellationParserSource.Token);
+        }
+
+        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            logger.Log(typeof(Program), Level.Critical, "Unhandled exception", e.ExceptionObject as Exception);
         }
 
         private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e)
