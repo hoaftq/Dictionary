@@ -248,7 +248,8 @@ namespace CollectData
 
             SubDictionary GetExistedSubDictionary(SubDictionary subDict)
             {
-                var reusedSubDict = subDictionaries.SingleOrDefault(s => s.Name == subDict.Name);
+                // Comparation is case insensitive in database!
+                var reusedSubDict = subDictionaries.SingleOrDefault(s => s.Name.Equals(subDict.Name, StringComparison.OrdinalIgnoreCase));
                 if (reusedSubDict != null)
                 {
                     return reusedSubDict;
@@ -267,7 +268,7 @@ namespace CollectData
 
             WordClass GetExistedWordClass(WordClass wordClass)
             {
-                var reusedWordClass = wordClasses.SingleOrDefault(w => w.Name == wordClass.Name);
+                var reusedWordClass = wordClasses.SingleOrDefault(w => w.Name.Equals(wordClass.Name, StringComparison.OrdinalIgnoreCase));
                 if (reusedWordClass != null)
                 {
                     return reusedWordClass;
@@ -313,20 +314,27 @@ namespace CollectData
                 context.SaveChanges();
 
                 successWordCount += words.Count;
-                logger.Log(GetType(), Level.Info, $"{words.Count} words '{string.Join(", ", words.Select(w => w.Content))}' were registered successfully", null);
+                logger.Log(GetType(), Level.Info, $"{words.Count} word(s) '{string.Join(", ", words.Select(w => w.Content))}' were registered successfully", null);
             }
             catch (DbUpdateException)
             {
-                // The word could not be saved, remove it from the context
+                logger.Log(GetType(), Level.Info, $"Could not save {words.Count} word(s) '{string.Join(", ", words.Select(w => w.Content))}', trying to register each word individually", null);
+
+                // The words could not be saved, remove them from the context
                 // TODO is this enough?
-                context.Words.RemoveRange(words);
+                //context.Words.RemoveRange(words);
+                foreach (var word in words)
+                {
+                    context.Entry(word).State = EntityState.Detached;
+                }
 
                 // Try to register each word separately
                 foreach (var word in words)
                 {
                     try
                     {
-                        context.Words.Add(word);
+                        //context.Words.Add(word);
+                        context.Entry(word).State = EntityState.Added;
                         context.SaveChanges();
 
                         successWordCount++;
@@ -334,7 +342,8 @@ namespace CollectData
                     }
                     catch (DbUpdateException ex)
                     {
-                        context.Words.Remove(word);
+                        //context.Words.Remove(word);
+                        context.Entry(word).State = EntityState.Detached;
                         logger.Log(GetType(), Level.Error, $"Could not save the word '{word.Content}' to database", ex);
                     }
                 }
