@@ -62,6 +62,10 @@
   <div class="spinner-border text-primary square-40" role="status">
   </div>
 </div>
-<div *ngIf="errorDto?.code === 404" class="mt-2">
-  <div class="mr-3 text-danger">Could not find <span class="h4">{{searchWord}}</span> in the dictionary </div>
+<div *ngIf="errorDto" class="mt-2">
+  <ng-container [ngSwitch]="errorDto.code">
+    <div *ngSwitchCase="404" class="mr-3 text-danger">Could not find <span class="h4">{{searchWord}}</span> in the dictionary</div>
+    <div *ngSwitchCase="500" class="mr-3 text-danger">Errors occured on the server</div>
+    <div *ngSwitchDefault class="mr-3 text-danger">Something went wrong. Please try to refresh the page</div>
+  </ng-container>
 </div>
