@@ -314,38 +314,44 @@ namespace CollectData
                 context.SaveChanges();
 
                 successWordCount += words.Count;
-                logger.Log(GetType(), Level.Info, $"{words.Count} word(s) '{string.Join(", ", words.Select(w => w.Content))}' were registered successfully", null);
+                logger.Log(GetType(), Level.Info, $"{words.Count} word(s) '{string.Join(", ", words.Select(w => w.Content))}' was(were) registered successfully", null);
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex)
             {
-                logger.Log(GetType(), Level.Info, $"Could not save {words.Count} word(s) '{string.Join(", ", words.Select(w => w.Content))}', trying to register each word individually", null);
+                logger.Log(GetType(), Level.Info, $"Could not save {words.Count} word(s) '{string.Join(", ", words.Select(w => w.Content))}', trying to register each word individually", ex);
 
                 // The words could not be saved, remove them from the context
-                // TODO is this enough?
-                //context.Words.RemoveRange(words);
-                foreach (var word in words)
-                {
-                    context.Entry(word).State = EntityState.Detached;
-                }
+                //context.Words.RemoveRange(words); // TODO is this enough?
+                ResetContext();
 
                 // Try to register each word separately
                 foreach (var word in words)
                 {
                     try
                     {
-                        //context.Words.Add(word);
-                        context.Entry(word).State = EntityState.Added;
+                        context.Words.Add(word);
                         context.SaveChanges();
 
                         successWordCount++;
                         logger.Log(GetType(), Level.Info, $"The word '{word.Content}' was registered successfully", null);
                     }
-                    catch (DbUpdateException ex)
+                    catch (DbUpdateException e)
                     {
-                        //context.Words.Remove(word);
-                        context.Entry(word).State = EntityState.Detached;
-                        logger.Log(GetType(), Level.Error, $"Could not save the word '{word.Content}' to database", ex);
+                        ResetContext();
+                        logger.Log(GetType(), Level.Error, $"Could not save the word '{word.Content}' to database", e);
                     }
+                }
+            }
+        }
+
+        private void ResetContext()
+        {
+            foreach (var entity in context.ChangeTracker.Entries())
+            {
+                // There are SubDictionary or Wordclass entities that have state of Unchanged, do not modify their state
+                if (entity.State == EntityState.Added)
+                {
+                    entity.State = EntityState.Detached;
                 }
             }
         }
@@ -488,7 +494,7 @@ namespace CollectData
             {
                 wordClass = new WordClass()
                 {
-                    Name = wordClassText
+                    Name = wordClassText?.Substring(0, 100)
                 };
             }
 
