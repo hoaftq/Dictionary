@@ -489,12 +489,16 @@ namespace CollectData
         private IEnumerable<Definition> ReadWordClass(HtmlNode wordClassNode, Word word, SubDictionary subDictionary)
         {
             string wordClassText = wordClassNode.SelectSingleNode("./h3[1]/span/text()").InnerText?.TrimAllSpecialCharacters();
+            if ((wordClassText?.Length ?? 0) > 100)
+            {
+                wordClassText = wordClassText.Substring(0, 100);
+            }
             WordClass wordClass = null; // context.WordClasses.SingleOrDefault(wc => wc.Name == wordClassText);
             if (wordClass == null)
             {
                 wordClass = new WordClass()
                 {
-                    Name = wordClassText?.Substring(0, 100)
+                    Name = wordClassText
                 };
             }
 
