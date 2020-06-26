@@ -1,4 +1,5 @@
 import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { DictionaryService, SuggestionDto } from '../dictionary.service';
 
 @Component({
@@ -20,6 +21,8 @@ export class SearchBoxComponent implements OnInit {
   @Output()
   search = new EventEmitter<EnteringWord>();
 
+  subscription: Subscription;
+
   constructor(private dictService: DictionaryService) { }
 
   ngOnInit() {
@@ -35,13 +38,17 @@ export class SearchBoxComponent implements OnInit {
   }
 
   onInput(e/*: InputEvent*/) {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
+
     const searchingWord = (e.target as HTMLInputElement).value;
     if (!searchingWord) {
       this.suggestionWords = [];
       return;
     }
 
-    this.dictService.searchWords(searchingWord).subscribe(ws => {
+    this.subscription = this.dictService.searchWords(searchingWord).subscribe(ws => {
       this.isVisible = true;
       this.suggestionWords = ws;
     });
