@@ -24,10 +24,11 @@
       <div *ngFor="let sw of suggestionWords" class="col">
 
         <div class="suggestion-content" (click)="onSuggestionWordClick(sw)">
-          <div class="suggestion-word">{{sw.word}}</div>
-          <div *ngIf="sw.details && sw.details[0]">
-            <span class="font-weight-bold mr-2">{{sw.details[0].wordClass}}</span>
-            <span>{{sw.details[0].definition}}</span>
+          <span class="suggestion-word">{{sw.word}}</span>
+          <span class="text-deeppink ml-4">{{sw.spelling}}</span>
+          <div>
+            <span *ngIf="sw.wordClass != 'Unknown'" class="font-weight-bold mr-2">{{sw.wordClass}}</span>
+            <span>{{sw.definition}}</span>
           </div>
         </div>
 

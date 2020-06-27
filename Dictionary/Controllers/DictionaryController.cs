@@ -14,6 +14,8 @@ namespace Dictionary.Controllers
     [ApiController]
     public class DictionaryController : ControllerBase
     {
+        private const int NumberOfSuggestionWords = 6;
+
         private readonly DictionaryContext context;
 
         public DictionaryController(DictionaryContext context)
@@ -41,7 +43,9 @@ namespace Dictionary.Controllers
                                         .ThenInclude(p => p.Definitions)
                                     .Include(w => w.WordForms)
                                     .Include(w => w.RelativeWords)
-                                    .FirstOrDefault(w => w.Content.Trim().ToLower() == word.Trim().ToLower());
+                                    .AsNoTracking()
+                                    .FirstOrDefault(w => w.Content == word);
+
             if (foundWord == null)
             {
                 return NotFound();
@@ -51,7 +55,7 @@ namespace Dictionary.Controllers
         }
 
         [HttpPost("{action}")]
-        public IEnumerable<WordDto> Search([FromForm]string word)
+        public IEnumerable<SuggestionDto> Search([FromForm]string word)
         {
             if (string.IsNullOrEmpty(word))
             {
@@ -59,14 +63,21 @@ namespace Dictionary.Controllers
             }
 
             var foundWords = context.Words.Include(w => w.Definitions)
-                                              .ThenInclude(d => d.SubDictionary)
-                                          .Include(w => w.Definitions)
                                               .ThenInclude(d => d.WordClass)
                                           .Where(w => w.Content.StartsWith(word))
-                                          .OrderBy(w => w.Content.Length)
-                                          .Take(10);
+                                          .OrderBy(w => w.Content) // Ordering by Content improves performance significantly comparing to Content.Length
+                                          .Take(NumberOfSuggestionWords)
+                                          .AsNoTracking();
 
-            return foundWords?.Select(w => ModelToDto(w));
+            var result = foundWords?.Select(w => new SuggestionDto()
+            {
+                Word = w.Content,
+                Spelling = w.Spelling,
+                WordClass = w.Definitions.Count > 0 ? w.Definitions[0].WordClass.Name : string.Empty,
+                Definition = w.Definitions.Count > 0 ? w.Definitions[0].Content : string.Empty
+            });
+
+            return result;
         }
 
         [HttpGet("{action}")]
@@ -88,14 +99,14 @@ namespace Dictionary.Controllers
             }
 
             var dictionaries = new List<WordSubDictionaryDto>();
-            foreach (var dictionaryGroup in word.Definitions.GroupBy(def => def.SubDictionary, def => def))
+            foreach (var dictionaryGroup in word.Definitions.GroupBy(def => def.SubDictionary.Name, def => def))
             {
                 var wordClasses = new List<DictionaryWordClassDto>();
-                foreach (var wordClassGroup in dictionaryGroup.GroupBy(def => def.WordClass, def => def))
+                foreach (var wordClassGroup in dictionaryGroup.GroupBy(def => def.WordClass.Name, def => def))
                 {
                     wordClasses.Add(new DictionaryWordClassDto()
                     {
-                        Name = wordClassGroup.Key.Name,
+                        Name = wordClassGroup.Key,
                         Definitions = wordClassGroup.Select(d => new DefinitionDto()
                         {
                             Content = d.Content,
@@ -109,7 +120,7 @@ namespace Dictionary.Controllers
                 }
 
                 var phases = word.Phases
-                    ?.Where(p => p.SubDictionary == dictionaryGroup.Key)
+                    ?.Where(p => p.SubDictionary?.Name == dictionaryGroup.Key)
                     .Select(p => new PhaseDto()
                     {
                         Content = p.Content,
@@ -126,13 +137,13 @@ namespace Dictionary.Controllers
 
                 dictionaries.Add(new WordSubDictionaryDto()
                 {
-                    Name = dictionaryGroup.Key.Name,
+                    Name = dictionaryGroup.Key,
                     WordClasses = wordClasses,
                     Phases = phases
                 });
             }
 
-            return new WordDto()
+            var result = new WordDto()
             {
                 Content = word.Content,
                 Spelling = word.Spelling,
@@ -152,6 +163,8 @@ namespace Dictionary.Controllers
                     WordClass = rw.WordClass
                 })
             };
+
+            return result;
         }
     }
 }

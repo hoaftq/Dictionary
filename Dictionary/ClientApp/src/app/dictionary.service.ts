@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -24,27 +24,7 @@ export class DictionaryService {
     const url = 'api/Dictionary/Search';
     const body = `word=${word}`;
     const options = { headers: new HttpHeaders().set('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8') };
-    return this.http.post<WordDto[]>(url, body, options).pipe(
-      map(
-        v => v.map(w => {
-          const details: SuggestionDetailsDto[] = [];
-          const sds = w.subDictionaries;
-          if (sds && sds[0]) {
-            const wcs = sds[0].wordClasses;
-            if (wcs && wcs[0] && wcs[0].definitions && wcs[0].definitions[0]) {
-              details.push({
-                wordClass: wcs[0].name,
-                definition: wcs[0].definitions[0].content
-              });
-            }
-          }
-          return {
-            word: w.content,
-            details: details
-          };
-        })
-      )
-    );
+    return this.http.post<SuggestionDto[]>(url, body, options);
   }
 }
 
@@ -95,10 +75,7 @@ export interface UsageDto {
 
 export interface SuggestionDto {
   word: string;
-  details: SuggestionDetailsDto[]
-}
-
-export interface SuggestionDetailsDto {
+  spelling: string;
   wordClass: string;
   definition: string;
 }

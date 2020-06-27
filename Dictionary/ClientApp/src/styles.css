@@ -15,3 +15,15 @@ code {
   background-color: dodgerblue;
   border-color: #1861ac;
 }
+
+.text-deeppink {
+  color: deeppink;
+}
+
+.text-blueviolet {
+  color: blueviolet;
+}
+
+.text-darkblue {
+  color: darkblue;
+}

@@ -31,8 +31,9 @@ export class SearchBoxComponent implements OnInit {
   onEnterKeyup(e: KeyboardEvent) {
     this.isVisible = false;
     const searchingWord = (e.target as HTMLInputElement).value;
+
     this.search.emit({
-      exactWord: searchingWord,
+      exactWord: (searchingWord || '').trim(),
       suggestionWord: this.suggestionWords.length ? this.suggestionWords[0].word : searchingWord
     });
   }
@@ -68,7 +69,7 @@ export class SearchBoxComponent implements OnInit {
 
   onSearch(w: string) {
     this.search.emit({
-      exactWord: w,
+      exactWord: (w || '').trim(),
       suggestionWord: w
     });
   }
