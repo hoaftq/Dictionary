@@ -34,22 +34,24 @@ namespace Dictionary.Controllers
             word = HttpUtility.UrlDecode(word);
 
             var foundWord = context.Words.Include(w => w.Definitions)
-                                    .ThenInclude(d => d.SubDictionary)
-                                    .Include(w => w.Definitions)
-                                        .ThenInclude(d => d.WordClass)
-                                    .Include(w => w.Definitions)
-                                        .ThenInclude(d => d.Usages)
-                                    .Include(w => w.Phases)
-                                        .ThenInclude(p => p.Definitions)
-                                    .Include(w => w.WordForms)
-                                    .Include(w => w.RelativeWords)
-                                    .AsNoTracking()
-                                    .FirstOrDefault(w => w.Content == word);
+                                            .ThenInclude(d => d.SubDictionary)
+                                        .Include(w => w.Definitions)
+                                            .ThenInclude(d => d.WordClass)
+                                        .Include(w => w.Definitions)
+                                            .ThenInclude(d => d.Usages)
+                                        .Include(w => w.Phases)
+                                            .ThenInclude(p => p.Definitions)
+                                        .Include(w => w.WordForms)
+                                        //.Include(w => w.RelativeWords)
+                                        .FirstOrDefault(w => w.Content == word);
 
             if (foundWord == null)
             {
                 return NotFound();
             }
+
+            // Using explicit loading improves performance
+            context.Entry(foundWord).Collection(w => w.RelativeWords).Load();
 
             return ModelToDto(foundWord);
         }

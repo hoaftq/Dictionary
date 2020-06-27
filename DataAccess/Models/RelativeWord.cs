@@ -14,9 +14,5 @@
         public int WordId { get; set; }
 
         public Word Word { get; set; }
-
-        //public int RelativeWordId { get; set; }
-
-        //public Word RelativeWord { get; set; }
     }
 }
