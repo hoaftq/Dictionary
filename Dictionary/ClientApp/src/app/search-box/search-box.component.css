@@ -1,6 +1,7 @@
 .suggestion-container {
   background-color: white;
   border: 1px solid lightblue;
+  z-index: 1;
 }
 
 .suggestion-content {

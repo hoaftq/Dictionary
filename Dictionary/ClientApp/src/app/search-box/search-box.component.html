@@ -6,7 +6,8 @@
            class="form-control"
            placeholder="Type words here"
            (keyup.enter)="onEnterKeyup($event)"
-           (input)="onInput($event)" />
+           (input)="onInput($event)"
+           (focus)="onFocus($event)"/>
   </div>
   <div class="col-auto">
     <button class="btn btn-primary ml-n2" (click)="onSearch(searchBox.value)">

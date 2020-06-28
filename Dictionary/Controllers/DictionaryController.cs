@@ -101,7 +101,8 @@ namespace Dictionary.Controllers
             }
 
             var dictionaries = new List<WordSubDictionaryDto>();
-            foreach (var dictionaryGroup in word.Definitions.GroupBy(def => def.SubDictionary.Name, def => def))
+            foreach (var dictionaryGroup in word.Definitions.OrderByDescending(def => def.SubDictionary.IsPrimary) //Primary sub dictionary should appear first
+                                                            .GroupBy(def => def.SubDictionary.Name, def => def))
             {
                 var wordClasses = new List<DictionaryWordClassDto>();
                 foreach (var wordClassGroup in dictionaryGroup.GroupBy(def => def.WordClass.Name, def => def))

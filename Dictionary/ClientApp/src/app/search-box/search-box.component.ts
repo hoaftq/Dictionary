@@ -73,6 +73,10 @@ export class SearchBoxComponent implements OnInit {
       suggestionWord: w
     });
   }
+
+  onFocus(e: FocusEvent) {
+    (e.target as HTMLInputElement).select();
+  }
 }
 
 export interface EnteringWord {
