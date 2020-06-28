@@ -21,8 +21,10 @@ export class DictionaryComponent implements OnInit {
 
   // A word is entered in the search box
   onSearchWord(e: EnteringWord) {
+    const searchingWord = e.suggestionWord && e.suggestionWord.toLowerCase().startsWith(e.exactWord.toLowerCase())
+                          ? e.suggestionWord : e.exactWord
     if (e.suggestionWord) {
-      this.router.navigate([`/${encodeURIComponent(e.suggestionWord)}`]);
+      this.router.navigate([`/${encodeURIComponent(searchingWord)}`]);
     }
   }
 
