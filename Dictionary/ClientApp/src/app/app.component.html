@@ -3,7 +3,7 @@
     <div class="row">
       <div class="col-lg-2"></div>
       <div class="col-12 col-lg-8">
-        <header class="mb-3">
+        <header class="mb-3 d-flex justify-content-between">
           <a class="h3 text-decoration-none" style="color:dodgerblue" [routerLink]="''">
             <svg class="bi bi-book-half" width="2em" height="2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
               <path fill-rule="evenodd" d="M12.786 1.072C11.188.752 9.084.71 7.646 2.146A.5.5 0 0 0 7.5 2.5v11a.5.5 0 0 0 .854.354c.843-.844 2.115-1.059 3.47-.92 1.344.14 2.66.617 3.452 1.013A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.276-.447L15.5 2.5l.224-.447-.002-.001-.004-.002-.013-.006-.047-.023a12.582 12.582 0 0 0-.799-.34 12.96 12.96 0 0 0-2.073-.609zM15 2.82v9.908c-.846-.343-1.944-.672-3.074-.788-1.143-.118-2.387-.023-3.426.56V2.718c1.063-.929 2.631-.956 4.09-.664A11.956 11.956 0 0 1 15 2.82z" />
@@ -11,8 +11,9 @@
             </svg>
             HDictionary
           </a>
-          <div class="float-right mt-4 text-darkblue">
-            English &rarr; Vietnamese
+          <div class="text-darkblue align-self-end">
+            <span class="d-inline d-sm-none">En &rarr; Vn</span>
+            <span class="d-none d-sm-inline">English &rarr; Vietnamese</span>
           </div>
         </header>
         <router-outlet></router-outlet>
