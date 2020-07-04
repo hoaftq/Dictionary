@@ -18,11 +18,15 @@ This is a responsive single-page-app dictionary using Angular and Bootstrap. Cur
 	- A better way to implement concurrent process?
 	- Justify parsing to reduce error words
 	- Adapt to read other dictionaries like Japanese-Vietnamese
+	- Dulicate words exist in the db, so in some cases it's imposible to get the best definition such as when looking up for the word Go
 
 3. Dictionary
 	A dictionary app includes a service using Asp.net Core API and a client using Angular.
 
    TODO list:
-   - Searching some words are too slow such as Action
-   - Searching for a work has not been completed, issue another search -> a bug
+   - (Done)Searching some words are too slow such as Action
+   - (Done)Searching for a work has not been completed, issue another search -> a bug
    - use a pipe for spelling html?
+   - Issue when suggestion response comes after searching response of the same word, the suggestion panel shouldn't show up
+   - Suggestion content should be from the primary sub directory (see the word Action)
+   - Use asynchoronous programming
