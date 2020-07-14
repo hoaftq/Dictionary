@@ -32,3 +32,5 @@ This is a responsive single-page-app dictionary using Angular and Bootstrap. Cur
    - Use asynchoronous programming
    - Set focus on search textbox when the page is first shown
    - Recent words feature
+   - Spelling shows escape characters in the suggestion panel. The word Palindrome is an example
+   
