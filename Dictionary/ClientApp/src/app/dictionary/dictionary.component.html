@@ -1,2 +1,3 @@
-<app-search-box [word]="word" (search)="onSearchWord($event)" (selectWord)="onSelectWord($event)"></app-search-box>
-<app-word-details [word]="word"></app-word-details>
+<app-search-box [word]="searchingWord" (search)="onSearchWord($event)"
+    (selectWord)="onSelectWord($event)"></app-search-box>
+<app-word-details [word]="searchingWord"></app-word-details>

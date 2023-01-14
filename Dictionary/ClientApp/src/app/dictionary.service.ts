@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -10,12 +10,15 @@ export class DictionaryService {
 
   constructor(private http: HttpClient) { }
 
-  getWordDetails(word: string): Observable<WordDto | ErrorDto> {
+  getWordDetails(word: string): Observable<Result> {
     const url = `api/Dictionary/${word}`;
     return this.http.get<WordDto>(url).pipe(
+      map(word => ({ word })),
       catchError(err => of({
-        code: err.status,
-        message: err.message
+        error: {
+          code: err.status,
+          message: err.message
+        }
       }))
     );
   }
@@ -26,6 +29,11 @@ export class DictionaryService {
     const options = { headers: new HttpHeaders().set('Content-Type', 'application/x-www-form-urlencoded; charset=utf-8') };
     return this.http.post<SuggestionDto[]>(url, body, options);
   }
+}
+
+export interface Result {
+  word?: WordDto;
+  error?: ErrorDto;
 }
 
 export interface WordDto {

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { DictionaryService, SuggestionDto } from '../dictionary.service';
 
@@ -7,10 +7,12 @@ import { DictionaryService, SuggestionDto } from '../dictionary.service';
   templateUrl: './search-box.component.html',
   styleUrls: ['./search-box.component.css']
 })
-export class SearchBoxComponent implements OnInit {
+export class SearchBoxComponent implements OnDestroy {
+  private subscription: Subscription;
+
   suggestionWords: SuggestionDto[] = [];
 
-  isVisible = false;
+  isSuggestionPanelVisible = false;
 
   @Input()
   word = '';
@@ -21,42 +23,40 @@ export class SearchBoxComponent implements OnInit {
   @Output()
   search = new EventEmitter<EnteringWord>();
 
-  subscription: Subscription;
-
   constructor(private dictService: DictionaryService) { }
 
-  ngOnInit() {
+  ngOnDestroy(): void {
+    this.unsubscribe();
   }
 
   onEnterKeyup(e: KeyboardEvent) {
-    this.isVisible = false;
+    this.isSuggestionPanelVisible = false;
     const searchingWord = (e.target as HTMLInputElement).value;
 
     this.search.emit({
-      exactWord: (searchingWord || '').trim(),
-      suggestionWord: this.suggestionWords.length ? this.suggestionWords[0].word : searchingWord
+      exactWord: searchingWord,
+      bestSuggestionWord: this.suggestionWords.length ? this.suggestionWords[0].word : ''
     });
   }
 
   onInput(e/*: InputEvent*/) {
-    if (this.subscription) {
-      this.subscription.unsubscribe();
-    }
+    this.unsubscribe();
 
-    const searchingWord = (e.target as HTMLInputElement).value;
+    this.suggestionWords = [];
+
+    const searchingWord = (e.target as HTMLInputElement).value.trim();
     if (!searchingWord) {
-      this.suggestionWords = [];
       return;
     }
 
     this.subscription = this.dictService.searchWords(searchingWord).subscribe(ws => {
-      this.isVisible = true;
+      this.isSuggestionPanelVisible = true;
       this.suggestionWords = ws;
     });
   }
 
   onSuggestionWordClick(sw: SuggestionDto) {
-    this.isVisible = false;
+    this.isSuggestionPanelVisible = false;
     this.word = sw.word;
     this.selectWord.emit(sw.word);
   }
@@ -64,23 +64,28 @@ export class SearchBoxComponent implements OnInit {
   // Hide the suggestion panel when user clicks anywhere
   @HostListener('window:click', ['$event'])
   onWindowClick(_e: MouseEvent) {
-    this.isVisible = false;
+    this.isSuggestionPanelVisible = false;
   }
 
   onSearch(w: string) {
     this.search.emit({
-      exactWord: (w || '').trim(),
-      suggestionWord: w
+      exactWord: w,
+      bestSuggestionWord: ''
     });
   }
 
   onFocus(e: FocusEvent) {
     (e.target as HTMLInputElement).select();
   }
+
+  private unsubscribe() {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
+  }
 }
 
 export interface EnteringWord {
   exactWord: string;
-  suggestionWord: string;
+  bestSuggestionWord: string;
 }
-
