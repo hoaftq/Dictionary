@@ -1,5 +1,6 @@
 import { Component, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 import { DictionaryService, SuggestionDto } from '../dictionary.service';
 
 @Component({
@@ -7,8 +8,11 @@ import { DictionaryService, SuggestionDto } from '../dictionary.service';
   templateUrl: './search-box.component.html',
   styleUrls: ['./search-box.component.css']
 })
-export class SearchBoxComponent implements OnDestroy {
-  private subscription: Subscription;
+export class SearchBoxComponent implements OnInit, OnDestroy {
+  private serviceSubscription: Subscription;
+  private inputSubscription: Subscription;
+
+  inputSubject = new Subject<string>();
 
   suggestionWords: SuggestionDto[] = [];
 
@@ -25,8 +29,31 @@ export class SearchBoxComponent implements OnDestroy {
 
   constructor(private dictService: DictionaryService) { }
 
+  ngOnInit(): void {
+    this.inputSubscription = this.inputSubject.asObservable()
+      .pipe(
+        debounceTime(200)
+      )
+      .subscribe(value => {
+        this.unsubscribeService();
+
+        this.suggestionWords = [];
+
+        const searchingWord = value.trim();
+        if (!searchingWord) {
+          return;
+        }
+
+        this.serviceSubscription = this.dictService.searchWords(searchingWord).subscribe(ws => {
+          this.isSuggestionPanelVisible = true;
+          this.suggestionWords = ws;
+        });
+      })
+  }
+
   ngOnDestroy(): void {
-    this.unsubscribe();
+    this.unsubscribeService();
+    this.inputSubscription.unsubscribe();
   }
 
   onEnterKeyup(e: KeyboardEvent) {
@@ -40,19 +67,7 @@ export class SearchBoxComponent implements OnDestroy {
   }
 
   onInput(e/*: InputEvent*/) {
-    this.unsubscribe();
-
-    this.suggestionWords = [];
-
-    const searchingWord = (e.target as HTMLInputElement).value.trim();
-    if (!searchingWord) {
-      return;
-    }
-
-    this.subscription = this.dictService.searchWords(searchingWord).subscribe(ws => {
-      this.isSuggestionPanelVisible = true;
-      this.suggestionWords = ws;
-    });
+    this.inputSubject.next((e.target as HTMLInputElement).value);
   }
 
   onSuggestionWordClick(sw: SuggestionDto) {
@@ -78,9 +93,9 @@ export class SearchBoxComponent implements OnDestroy {
     (e.target as HTMLInputElement).select();
   }
 
-  private unsubscribe() {
-    if (this.subscription) {
-      this.subscription.unsubscribe();
+  private unsubscribeService() {
+    if (this.serviceSubscription) {
+      this.serviceSubscription.unsubscribe();
     }
   }
 }
